@@ -68,4 +68,25 @@ extern uint8_t g_cosmac_idle_brs[];
 void cosmac_brs_overflow(void) noreturn_function;
 #endif
 
+/* Interrupts (cosmac_irqentry.S, cosmac_doirq.c) */
+
+void cosmac_irq_install(void);
+FAR uint8_t *cosmac_doirq(FAR uint8_t *regs);
+
+/* Provided by the board: its interrupt controller.  The CDP1802 has one
+ * INTERRUPT input; the board multiplexes its sources onto it.
+ *
+ * cosmac_irq_initialize() - all sources disabled, nothing pending.
+ * cosmac_irq_acknowledge() - called once per interrupt: the number of the
+ *   source to dispatch (0 .. NR_IRQS - 1), or a negative value for a
+ *   spurious interrupt.
+ * cosmac_irq_rearm(irq) - called after the handler of irq has run, before
+ *   the interrupt returns (e.g. to re-enable a source that the controller
+ *   masks on acknowledge).
+ */
+
+void cosmac_irq_initialize(void);
+int cosmac_irq_acknowledge(void);
+void cosmac_irq_rearm(int irq);
+
 #endif /* __ARCH_COSMAC_SRC_COMMON_COSMAC_INTERNAL_H */

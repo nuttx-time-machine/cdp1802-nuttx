@@ -44,12 +44,6 @@
  * Public Functions
  ****************************************************************************/
 
-/* Timer (Step 07) */
-
-void up_timer_initialize(void)
-{
-}
-
 /* Threads and context switching (Step 08) */
 
 int up_create_stack(FAR struct tcb_s *tcb, size_t stack_size, uint8_t ttype)

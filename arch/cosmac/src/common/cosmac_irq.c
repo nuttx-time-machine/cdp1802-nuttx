@@ -31,6 +31,8 @@
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
 
+#include "cosmac_internal.h"
+
 /****************************************************************************
  * Public Data
  ****************************************************************************/
@@ -47,13 +49,21 @@ volatile uint8_t *g_current_regs;
  * Name: up_irqinitialize
  *
  * Description:
- *   Step 06: not in interrupt context, interrupts stay disabled (IE=0 since
- *   reset).  The interrupt entry (R1) and the board's interrupt controller
- *   are set up in Step 07.
+ *   Called by nx_start() with interrupts disabled (IE=0 since reset): point
+ *   R1 at the interrupt entry, quiet the board's interrupt controller, then
+ *   enable interrupts.  Sources are enabled one by one by their drivers
+ *   (up_enable_irq()).
  *
  ****************************************************************************/
 
 void up_irqinitialize(void)
 {
   g_current_regs = NULL;
+
+  cosmac_irq_install();
+  cosmac_irq_initialize();
+
+#ifndef CONFIG_SUPPRESS_INTERRUPTS
+  up_irq_enable();
+#endif
 }

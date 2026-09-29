@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_registerdump.c
+ * arch/cosmac/src/common/cosmac_doirq.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -27,55 +27,55 @@
 #include <nuttx/config.h>
 
 #include <stdint.h>
-#include <debug.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
+#include <nuttx/board.h>
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
-
-static unsigned int reg16(FAR const uint8_t *regs, int n)
-{
-  return ((unsigned int)regs[REG_R(n)] << 8) | regs[REG_R(n) + 1];
-}
+#include "sched/sched.h"
+#include "cosmac_internal.h"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
 /****************************************************************************
- * Name: up_dump_register
+ * Name: cosmac_doirq
  *
  * Description:
- *   Dump a saved register frame (layout in arch/cosmac/include/irq.h)
- *   after an assertion or crash.  R0 and R1 are not part of a context; R2
- *   is the stack pointer after the frame.
+ *   Called by the interrupt entry (cosmac_irqentry.S) with interrupts
+ *   disabled and the interrupted thread's register frame at regs.
+ *   Acknowledges the interrupt at the board's controller, dispatches it,
+ *   and returns the frame to resume: regs, or the frame of the thread that
+ *   the handler made ready to run.
  *
  ****************************************************************************/
 
-void up_dump_register(FAR void *dumpregs)
+FAR uint8_t *cosmac_doirq(FAR uint8_t *regs)
 {
-  FAR const uint8_t *regs = dumpregs != NULL ?
-                            (FAR const uint8_t *)dumpregs :
-                            (FAR const uint8_t *)up_current_regs();
-  int n;
+  FAR struct tcb_s **running_task = &g_running_tasks[this_cpu()];
+  FAR struct tcb_s *tcb = *running_task;
+  int irq;
 
-  if (regs == NULL)
+  tcb->xcp.regs = regs;
+  up_set_current_regs(regs);
+
+  irq = cosmac_irq_acknowledge();
+  if (irq >= 0)
     {
-      return;
+      irq_dispatch(irq, regs);
+      cosmac_irq_rearm(irq);
     }
 
-  _alert("XP:%02x D:%02x DF:%u IE:%u SP:%04x\n", regs[REG_XP],
-         regs[REG_D], regs[REG_DF] & 1, regs[REG_IE] & 1,
-         (unsigned int)up_getusrsp(regs));
+  /* A handler may have made another thread ready to run */
 
-  for (n = 3; n <= 11; n += 4)
+  tcb = this_task();
+  if (tcb != *running_task)
     {
-      _alert("R%-2d %04x %04x %04x %04x\n", n, reg16(regs, n),
-             reg16(regs, n + 1), reg16(regs, n + 2), reg16(regs, n + 3));
+      nxsched_switch_context(*running_task, tcb);
+      *running_task = tcb;
     }
 
-  _alert("R15 %04x\n", reg16(regs, 15));
+  up_set_current_regs(NULL);
+  return tcb->xcp.regs;
 }

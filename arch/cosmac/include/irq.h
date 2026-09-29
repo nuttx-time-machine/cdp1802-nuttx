@@ -50,23 +50,27 @@
 #define COSMAC_IRQ_CONSOLE    6   /* sim1802 console input */
 #define NR_IRQS               8
 
-/* Register save area (PROVISIONAL: the byte-accurate layout is defined by
- * Step 08, docs/cdp1802/context.md).  Indices are byte offsets into
- * struct xcptcontext::regs[].
+/* Register frame (docs/cdp1802/context.md in the port's meta repository).
+ * The interrupt entry (cosmac_irqentry.S) pushes it on the interrupted
+ * thread's stack, and a thread-level context switch builds the same frame.
+ * Offsets are from the lowest address (the frame base); R2 is not stored:
+ * the thread's stack pointer is the frame base + XCPTCONTEXT_SIZE.  R0
+ * (DMA) and R1 (the interrupt PC) are not part of a thread's context.
  */
 
-#define REG_XP                0   /* T at interrupt time: X (high nibble), P */
-#define REG_D                 1   /* D accumulator */
-#define REG_DF                2   /* DF (bit 0) */
-#define REG_IE                3   /* IE (bit 0) */
-#define REG_R1H               4   /* R1 .. R15, high byte first */
-#define REG_R(n)              (REG_R1H + 2 * ((n) - 1))
-#define REG_SPH               REG_R(2)
-#define REG_SPL               (REG_R(2) + 1)
+/* Rn (3..15): high byte at REG_R(n), low byte at REG_R(n) + 1 */
+
+#define REG_BUF               0   /* sim1802 I/O argument buffer */
+#define REG_R(n)              (1 + 2 * (15 - (n)))
+#define REG_IE                27  /* IE to resume with (0 or 1) */
+#define REG_DF                28  /* DF in bit 0 */
+#define REG_D                 29  /* D accumulator */
+#define REG_XP                30  /* T: X (high nibble), P (low nibble) */
+#define XCPTCONTEXT_REGS      31
+#define XCPTCONTEXT_SIZE      XCPTCONTEXT_REGS
+
 #define REG_PCH               REG_R(3)
 #define REG_PCL               (REG_R(3) + 1)
-#define XCPTCONTEXT_REGS      (REG_R(15) + 2)
-#define XCPTCONTEXT_SIZE      XCPTCONTEXT_REGS
 
 /* Stacks are byte aligned on the CDP1802 */
 
@@ -80,9 +84,11 @@
 
 struct xcptcontext
 {
-  /* Register save area */
+  /* The saved register frame, on the thread's own stack, while the thread
+   * is not running.
+   */
 
-  uint8_t regs[XCPTCONTEXT_REGS];
+  FAR uint8_t *regs;
 };
 
 #endif /* __ASSEMBLY__ */
@@ -162,8 +168,7 @@ static inline_function uint16_t up_getsp(void)
     ((uint8_t *)((regs) ? (regs) : up_current_regs()))[REG_PCL])
 
 #define up_getusrsp(regs) \
-  ((uintptr_t)((((uint8_t *)(regs))[REG_SPH] << 8) | \
-                ((uint8_t *)(regs))[REG_SPL]))
+  ((uintptr_t)(regs) + XCPTCONTEXT_SIZE)
 
 #undef EXTERN
 #ifdef __cplusplus

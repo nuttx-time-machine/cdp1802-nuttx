@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_registerdump.c
+ * boards/cosmac/cdp1802/sim1802/src/sim1802_timer.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -27,18 +27,40 @@
 #include <nuttx/config.h>
 
 #include <stdint.h>
-#include <debug.h>
 
 #include <nuttx/arch.h>
+#include <nuttx/clock.h>
 #include <nuttx/irq.h>
+
+#include <arch/board/board.h>
+
+#include "sim1802_io.h"
+
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+/* Machine cycles per tick: 5 000 for a 4 MHz clock and 10 ms ticks.  The
+ * simulator's timer counts machine cycles (24 bits).
+ */
+
+#define SIM1802_TICK_CYCLES \
+  ((uint32_t)((unsigned long long)BOARD_MACHINE_CYCLE * \
+              CONFIG_USEC_PER_TICK / 1000000))
+
+#if (BOARD_MACHINE_CYCLE * CONFIG_USEC_PER_TICK / 1000000) < 1 || \
+    (BOARD_MACHINE_CYCLE * CONFIG_USEC_PER_TICK / 1000000) > 0xffffff
+#  error "CONFIG_USEC_PER_TICK out of range of the sim1802 timer"
+#endif
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static unsigned int reg16(FAR const uint8_t *regs, int n)
+static int sim1802_timerisr(int irq, FAR void *context, FAR void *arg)
 {
-  return ((unsigned int)regs[REG_R(n)] << 8) | regs[REG_R(n) + 1];
+  nxsched_process_timer();
+  return 0;
 }
 
 /****************************************************************************
@@ -46,36 +68,28 @@ static unsigned int reg16(FAR const uint8_t *regs, int n)
  ****************************************************************************/
 
 /****************************************************************************
- * Name: up_dump_register
+ * Name: up_timer_initialize
  *
  * Description:
- *   Dump a saved register frame (layout in arch/cosmac/include/irq.h)
- *   after an assertion or crash.  R0 and R1 are not part of a context; R2
- *   is the stack pointer after the frame.
+ *   The system tick: the simulator's cycle-driven timer (mode 4) raises
+ *   IRQ 0 every SIM1802_TICK_CYCLES machine cycles, so simulated time is
+ *   exact and independent of the host.
  *
  ****************************************************************************/
 
-void up_dump_register(FAR void *dumpregs)
+void up_timer_initialize(void)
 {
-  FAR const uint8_t *regs = dumpregs != NULL ?
-                            (FAR const uint8_t *)dumpregs :
-                            (FAR const uint8_t *)up_current_regs();
-  int n;
+  uint32_t period = SIM1802_TICK_CYCLES;
+  irqstate_t flags;
 
-  if (regs == NULL)
-    {
-      return;
-    }
+  irq_attach(COSMAC_IRQ_TIMER, sim1802_timerisr, NULL);
 
-  _alert("XP:%02x D:%02x DF:%u IE:%u SP:%04x\n", regs[REG_XP],
-         regs[REG_D], regs[REG_DF] & 1, regs[REG_IE] & 1,
-         (unsigned int)up_getusrsp(regs));
+  flags = up_irq_save();
+  sim1802_command(SIM1802_CMD_TIMER_PERIOD0, period & 0xff);
+  sim1802_command(SIM1802_CMD_TIMER_PERIOD1, (period >> 8) & 0xff);
+  sim1802_command(SIM1802_CMD_TIMER_PERIOD2, (period >> 16) & 0xff);
+  sim1802_command(SIM1802_CMD_TIMER_CONTROL, SIM1802_TIMER_CYCLES);
+  up_irq_restore(flags);
 
-  for (n = 3; n <= 11; n += 4)
-    {
-      _alert("R%-2d %04x %04x %04x %04x\n", n, reg16(regs, n),
-             reg16(regs, n + 1), reg16(regs, n + 2), reg16(regs, n + 3));
-    }
-
-  _alert("R15 %04x\n", reg16(regs, 15));
+  up_enable_irq(COSMAC_IRQ_TIMER);
 }
