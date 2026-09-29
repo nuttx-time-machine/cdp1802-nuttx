@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_stubs.c
+ * arch/cosmac/src/common/cosmac_switchcontext.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,37 +20,53 @@
  *
  ****************************************************************************/
 
-/* STEP 04 STUBS: the architecture interfaces that NuttX common code needs
- * in order to link, each one PANIC()ing (or doing nothing, where doing
- * nothing is a correct minimal implementation).  They exist only for the
- * size-feasibility measurement; Steps 05-09 replace them with real code.
- * The list was produced by the linker: see docs/journal/step-04.md in the
- * meta repository.
- */
-
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
 
-#include <stdint.h>
-#include <string.h>
-
 #include <nuttx/arch.h>
-#include <nuttx/irq.h>
+#include <nuttx/sched.h>
+
+#include "sched/sched.h"
+#include "cosmac_internal.h"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-/* up_saveusercontext() runs inside _assert(), so it must never PANIC().
- * It records a zeroed frame: an assertion in thread context then dumps no
- * register values (those of an interrupted thread are in its frame).
- */
+/****************************************************************************
+ * Name: up_switch_context
+ *
+ * Description:
+ *   A task is currently in the ready-to-run list but has been prepped to
+ *   execute.  Restore its context, and start execution.
+ *
+ * Input Parameters:
+ *   tcb: Refers to the head task of the ready-to-run list which will be
+ *     executed.
+ *   rtcb: Refers to the running task which will be blocked.
+ *
+ ****************************************************************************/
 
-int up_saveusercontext(FAR void *saveregs)
+void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb)
 {
-  memset(saveregs, 0, XCPTCONTEXT_SIZE);
-  return 0;
+  /* In an interrupt handler, cosmac_doirq() notices the new head of the
+   * ready-to-run list and resumes it when the handler returns.
+   */
+
+  if (!up_interrupt_context())
+    {
+      nxsched_switch_context(rtcb, tcb);
+      g_running_tasks[this_cpu()] = tcb;
+
+#ifdef CONFIG_COSMAC_BANKING
+      cosmac_bank_switch(rtcb, tcb);
+#endif
+
+      /* Returns when rtcb runs again */
+
+      cosmac_switchcontext(&rtcb->xcp.regs, tcb->xcp.regs);
+    }
 }

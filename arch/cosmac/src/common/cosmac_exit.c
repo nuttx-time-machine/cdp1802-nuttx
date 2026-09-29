@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_stubs.c
+ * arch/cosmac/src/common/cosmac_exit.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,37 +20,52 @@
  *
  ****************************************************************************/
 
-/* STEP 04 STUBS: the architecture interfaces that NuttX common code needs
- * in order to link, each one PANIC()ing (or doing nothing, where doing
- * nothing is a correct minimal implementation).  They exist only for the
- * size-feasibility measurement; Steps 05-09 replace them with real code.
- * The list was produced by the linker: see docs/journal/step-04.md in the
- * meta repository.
- */
-
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
 
-#include <stdint.h>
-#include <string.h>
-
 #include <nuttx/arch.h>
-#include <nuttx/irq.h>
+#include <nuttx/sched.h>
+
+#include "sched/sched.h"
+#include "task/task.h"
+#include "cosmac_internal.h"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-/* up_saveusercontext() runs inside _assert(), so it must never PANIC().
- * It records a zeroed frame: an assertion in thread context then dumps no
- * register values (those of an interrupted thread are in its frame).
- */
+/****************************************************************************
+ * Name: up_exit
+ *
+ * Description:
+ *   This function causes the currently executing task to cease to exist.
+ *   This is a special case of task_delete() where the task to be deleted is
+ *   the currently executing task.  It is more complex because a context
+ *   switch must be performed to the next ready to run task.
+ *
+ ****************************************************************************/
 
-int up_saveusercontext(FAR void *saveregs)
+void up_exit(int status)
 {
-  memset(saveregs, 0, XCPTCONTEXT_SIZE);
-  return 0;
+  FAR struct tcb_s *tcb;
+
+  /* Destroy the task at the head of the ready to run list; the next one
+   * becomes the head.
+   */
+
+  nxtask_exit();
+
+  tcb = this_task();
+  g_running_tasks[this_cpu()] = tcb;
+
+#ifdef CONFIG_COSMAC_BANKING
+  /* The exiting thread's bank state is discarded */
+
+  cosmac_bank_switch(NULL, tcb);
+#endif
+
+  cosmac_fullcontextrestore(tcb->xcp.regs);
 }

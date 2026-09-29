@@ -31,6 +31,8 @@
 
 #include <stdint.h>
 
+#include <arch/irq.h>
+
 /****************************************************************************
  * Public Data
  ****************************************************************************/
@@ -51,6 +53,20 @@ extern uint8_t _ebss[];
 
 #define COSMAC_RAM_LAST       0xffff
 
+/* Fill byte of unused stack memory (CONFIG_STACK_COLORATION) */
+
+#define STACK_COLOR           0xa5
+
+/* Store a 16-bit register value in a register frame (high byte first) */
+
+#define cosmac_setreg(regs, n, value) \
+  do \
+    { \
+      (regs)[REG_R(n)]     = (uint8_t)((uintptr_t)(value) >> 8); \
+      (regs)[REG_R(n) + 1] = (uint8_t)(uintptr_t)(value); \
+    } \
+  while (0)
+
 #ifdef CONFIG_COSMAC_BANKING
 /* Code banking state (cosmac_farcall.S).  The first four bytes are per
  * thread: BRS pointer, free BRS entries, selected bank.
@@ -66,7 +82,24 @@ extern uint8_t g_cosmac_idle_brs[];
 
 #ifdef CONFIG_COSMAC_BANKING
 void cosmac_brs_overflow(void) noreturn_function;
+#endif
 
+/* NCRT call and return routines (cosmac_ncrt.S) */
+
+void cosmac_ncrt_call(void);
+void cosmac_ncrt_ret(void);
+
+/* Interrupts (cosmac_irqentry.S, cosmac_doirq.c) */
+
+void cosmac_irq_install(void);
+FAR uint8_t *cosmac_doirq(FAR uint8_t *regs);
+
+/* Context switch (cosmac_doswitch.S) */
+
+void cosmac_switchcontext(FAR uint8_t **saveregs, FAR uint8_t *restoreregs);
+void cosmac_fullcontextrestore(FAR uint8_t *restoreregs) noreturn_function;
+
+#ifdef CONFIG_COSMAC_BANKING
 /* Per-thread banking state (cosmac_banking.c, cosmac_farcall.S) */
 
 struct tcb_s;
@@ -74,11 +107,6 @@ void cosmac_bank_initstate(FAR struct tcb_s *tcb);
 void cosmac_bank_switch(FAR struct tcb_s *from, FAR struct tcb_s *to);
 void cosmac_bank_select(uint8_t bank);
 #endif
-
-/* Interrupts (cosmac_irqentry.S, cosmac_doirq.c) */
-
-void cosmac_irq_install(void);
-FAR uint8_t *cosmac_doirq(FAR uint8_t *regs);
 
 /* Provided by the board: its interrupt controller.  The CDP1802 has one
  * INTERRUPT input; the board multiplexes its sources onto it.
