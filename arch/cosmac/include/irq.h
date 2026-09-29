@@ -90,6 +90,16 @@ struct xcptcontext
 
   FAR uint8_t *regs;
 
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+  /* Signal delivery (cosmac_schedulesigaction.c): the frame that was
+   * redirected to the signal trampoline, and a copy of its original
+   * contents, restored when the handlers have run.
+   */
+
+  FAR uint8_t *saved_regs;
+  uint8_t sigregs[XCPTCONTEXT_REGS];
+#endif
+
 #ifdef CONFIG_COSMAC_BANKING
   /* Code banking (cosmac_farcall.S): the thread's copy of the first four
    * bytes of g_cosmac_bankstate (BRS pointer, free entries, bank) while it

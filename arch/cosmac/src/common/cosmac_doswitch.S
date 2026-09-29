@@ -42,6 +42,7 @@
 
 	.global	cosmac_switchcontext
 	.global	cosmac_fullcontextrestore
+	.global	cosmac_sigreturn
 	.global	cosmac_irq_exit
 #ifdef CONFIG_COSMAC_IRQSTATE_SWFLAG
 	.global	g_cosmac_ie
@@ -208,3 +209,38 @@ cosmac_fullcontextrestore:
 	plo	1
 	sep	1			/* cosmac_irq_exit, with P=1 */
 	.size	cosmac_fullcontextrestore, .-cosmac_fullcontextrestore
+
+/****************************************************************************
+ * Name: cosmac_sigreturn
+ *
+ * Description:
+ *   void cosmac_sigreturn(const uint8_t *copy, uint8_t *regs)
+ *
+ *   End of signal delivery: copy the saved frame (R7) back to its place on
+ *   the stack (R8) and resume it.  The caller's own stack lies there, so
+ *   interrupts are disabled first and the copy uses registers only.  Does
+ *   not return.
+ *
+ ****************************************************************************/
+
+	.type	cosmac_sigreturn, @function
+cosmac_sigreturn:
+	sex	3
+	dis
+	.byte	0x23
+	ldi	XCPTCONTEXT_SIZE
+	plo	9
+1:	lda	7
+	str	8
+	inc	8
+	dec	9
+	glo	9
+	lbnz	1b
+	glo	8			/* R7 := regs (R8 - XCPTCONTEXT_SIZE) */
+	smi	XCPTCONTEXT_SIZE
+	plo	7
+	ghi	8
+	smbi	0
+	phi	7
+	lbr	cosmac_fullcontextrestore
+	.size	cosmac_sigreturn, .-cosmac_sigreturn

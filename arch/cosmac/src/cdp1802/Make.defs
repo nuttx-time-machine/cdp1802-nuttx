@@ -34,6 +34,10 @@ CMN_CSRCS += cosmac_initialstate.c cosmac_irq.c cosmac_nputs.c
 CMN_CSRCS += cosmac_registerdump.c cosmac_stackframe.c cosmac_stubs.c
 CMN_CSRCS += cosmac_switchcontext.c
 
+ifeq ($(CONFIG_ENABLE_ALL_SIGNALS),y)
+CMN_CSRCS += cosmac_schedulesigaction.c cosmac_sigdeliver.c
+endif
+
 ifneq ($(CONFIG_ARCH_IDLE_CUSTOM),y)
 CMN_CSRCS += cosmac_idle.c
 endif

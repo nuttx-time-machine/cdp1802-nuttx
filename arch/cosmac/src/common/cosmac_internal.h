@@ -94,10 +94,13 @@ void cosmac_ncrt_ret(void);
 void cosmac_irq_install(void);
 FAR uint8_t *cosmac_doirq(FAR uint8_t *regs);
 
-/* Context switch (cosmac_doswitch.S) */
+/* Context switch and signals (cosmac_doswitch.S, cosmac_sigdeliver.c) */
 
 void cosmac_switchcontext(FAR uint8_t **saveregs, FAR uint8_t *restoreregs);
 void cosmac_fullcontextrestore(FAR uint8_t *restoreregs) noreturn_function;
+void cosmac_sigdeliver(void);
+void cosmac_sigreturn(FAR const uint8_t *copy, FAR uint8_t *regs)
+  noreturn_function;
 
 #ifdef CONFIG_COSMAC_BANKING
 /* Per-thread banking state (cosmac_banking.c, cosmac_farcall.S) */
