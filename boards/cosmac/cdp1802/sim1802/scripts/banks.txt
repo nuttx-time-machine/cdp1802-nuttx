@@ -6,16 +6,28 @@
 #   <bank>|auto|fixed   <archive-glob>:<member-glob>
 #
 # Objects that match no rule stay in the 32 KiB fixed ROM, as do libgcc and
-# the board library (not given to the tool).  The architecture library holds
-# the reset code, the NCRT and far-call routines and the interrupt and
-# context-switch code: it must stay fixed, except the 64-bit division
-# helpers (plain C functions, not used by the tick or the switch path).  Every far call costs about 400
-# machine cycles more than a near call, so frequently called code (the
-# memory manager) stays fixed as well.
+# the board library (not given to the tool).  From the architecture
+# library, everything that runs while the bank state or a register frame
+# is being changed must stay fixed: the reset code's helpers, NCRT, the
+# far-call trampoline and the per-thread bank switch, the interrupt entry
+# and dispatch, the context switch, task exit and the signal trampoline
+# (a frame resumes it directly, not through a call).  The rest of the
+# architecture library and the memory manager are ordinary C code and go
+# to banks: all read-only data stays in fixed ROM, which is the scarce
+# part (the far call costs about 400 machine cycles, ADR 0013).
 
-auto    libarch.a:cosmac_div64.o
-fixed   libarch.a:*
-fixed   libmm.a:*
+fixed   libarch.a:cosmac_ncrt.o
+fixed   libarch.a:cosmac_farcall.o
+fixed   libarch.a:cosmac_banking.o
+fixed   libarch.a:cosmac_irqentry.o
+fixed   libarch.a:cosmac_irqsave.o
+fixed   libarch.a:cosmac_doirq.o
+fixed   libarch.a:cosmac_doswitch.o
+fixed   libarch.a:cosmac_switchcontext.o
+fixed   libarch.a:cosmac_exit.o
+fixed   libarch.a:cosmac_sigdeliver.o
+auto    libarch.a:*
+auto    libmm.a:*
 
 # The timer tick runs 50 times a second: every far call on its path costs
 # about 400 cycles (measured at Step 07: a tick with this path banked took
