@@ -20,6 +20,16 @@ config ARCH_BOARD_AMBER
 		on the Atmel AVR ATMega128 MCU.  There is not much there yet and what is
 		there is untested due to tool-related issues.
 
+config ARCH_BOARD_SIM1802
+	bool "sim1802 virtual CDP1802 board"
+	depends on ARCH_CHIP_CDP1802
+	---help---
+		A virtual RCA CDP1802 board defined by the sim1802 simulator
+		(cdp1802-nuttx fork): ROM at the reset vector 0x0000, RAM above,
+		a console and a cycle-driven timer on the simulator's I/O
+		controller.  The raw ROM image boots exactly like a real
+		machine (sim1802 --rom).
+
 config ARCH_BOARD_ARDUINO_MEGA2560
 	bool "Arduino Mega 2560"
 	depends on ARCH_CHIP_ATMEGA2560
@@ -3938,6 +3948,7 @@ config ARCH_BOARD
 	string
 	default "amber"                        if ARCH_BOARD_AMBER
 	default "arduino-mega2560"             if ARCH_BOARD_ARDUINO_MEGA2560
+	default "sim1802"                      if ARCH_BOARD_SIM1802
 	default "arduino-due"                  if ARCH_BOARD_ARDUINO_DUE
 	default "arduino-r4-minima"            if ARCH_BOARD_ARDUINO_R4_MINIMA
 	default "arduino-m0"                   if ARCH_BOARD_ARDUINO_M0
@@ -5248,6 +5259,9 @@ source "boards/avr/at90usb/teensy-2.0/Kconfig"
 endif
 if ARCH_BOARD_AMBER
 source "boards/avr/atmega/amber/Kconfig"
+endif
+if ARCH_BOARD_SIM1802
+source "boards/cosmac/cdp1802/sim1802/Kconfig"
 endif
 if ARCH_BOARD_ARDUINO_MEGA2560
 source "boards/avr/atmega/arduino-mega2560/Kconfig"
