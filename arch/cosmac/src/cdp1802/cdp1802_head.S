@@ -47,6 +47,9 @@
 	.global	cosmac_ncrt_ret
 	.global	cdp1802_boardinitialize
 	.global	nx_start
+#ifdef CONFIG_COSMAC_BANKING
+	.global	cosmac_bank_initialize
+#endif
 
 /****************************************************************************
  * Reset entry point (linked first, at 0x0000)
@@ -155,6 +158,13 @@ __start_c:
 	phi	5
 	ldi	%lo(cosmac_ncrt_ret)
 	plo	5
+
+#ifdef CONFIG_COSMAC_BANKING
+	/* Bank state and latch, before any banked code (cosmac_farcall.S) */
+
+	sep	4
+	.hword	cosmac_bank_initialize
+#endif
 
 	/* Board hook, then the OS */
 

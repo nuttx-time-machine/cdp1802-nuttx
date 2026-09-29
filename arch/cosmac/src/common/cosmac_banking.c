@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_internal.h
+ * arch/cosmac/src/common/cosmac_banking.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,52 +20,34 @@
  *
  ****************************************************************************/
 
-#ifndef __ARCH_COSMAC_SRC_COMMON_COSMAC_INTERNAL_H
-#define __ARCH_COSMAC_SRC_COMMON_COSMAC_INTERNAL_H
-
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
 
-#include <stdint.h>
+#include <debug.h>
+
+#include <nuttx/arch.h>
+
+#include "cosmac_internal.h"
 
 /****************************************************************************
- * Public Data
+ * Public Functions
  ****************************************************************************/
-
-/* First address above the idle stack (cdp1802_head.S); the heap starts
- * here and runs to the last RAM address, 0xFFFF, in every sim1802 memory
- * profile.
- */
-
-extern const uintptr_t g_idle_topstack;
-
-/* Linker script symbols */
-
-extern uint8_t _sdata[];
-extern uint8_t _edata[];
-extern uint8_t _sbss[];
-extern uint8_t _ebss[];
-
-#define COSMAC_RAM_LAST       0xffff
-
-#ifdef CONFIG_COSMAC_BANKING
-/* Code banking state (cosmac_farcall.S).  The first four bytes are per
- * thread: BRS pointer, free BRS entries, selected bank.
- */
-
-extern uint8_t g_cosmac_bankstate[];
-extern uint8_t g_cosmac_idle_brs[];
-#endif
 
 /****************************************************************************
- * Public Function Prototypes
+ * Name: cosmac_brs_overflow
+ *
+ * Description:
+ *   Called by __cosmac_farcall, with interrupts disabled, when a thread
+ *   nests more than CONFIG_COSMAC_BRS_DEPTH far calls.
+ *
  ****************************************************************************/
 
-#ifdef CONFIG_COSMAC_BANKING
-void cosmac_brs_overflow(void) noreturn_function;
-#endif
-
-#endif /* __ARCH_COSMAC_SRC_COMMON_COSMAC_INTERNAL_H */
+void cosmac_brs_overflow(void)
+{
+  _alert("bank return stack overflow (CONFIG_COSMAC_BRS_DEPTH=%d)\n",
+         CONFIG_COSMAC_BRS_DEPTH);
+  PANIC();
+}

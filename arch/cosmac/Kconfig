@@ -44,4 +44,43 @@ config COSMAC_IRQSTATE_SWFLAG
 
 endchoice # Interrupt enable state
 
+config COSMAC_BANKING
+	bool
+	default n
+	---help---
+		Code banking (selected by the board's memory profile): a 16 KiB
+		window at 0x8000 shows one bank of a larger ROM, selected by a
+		write-only latch on an output port.  Objects are placed in banks by
+		tools/cosmac/cosmac_bank.py at link time; calls between regions go
+		through stubs in fixed ROM and the far-call trampoline
+		(arch/cosmac/src/common/cosmac_farcall.S).
+
+if COSMAC_BANKING
+
+config COSMAC_BANK_PORT
+	int "Bank latch output port"
+	default 1
+	range 1 5
+	---help---
+		N of the OUT N instruction that writes the bank latch.  Ports 6 and
+		7 belong to the sim1802 I/O controller.
+
+config COSMAC_BANK_COUNT
+	int "Number of 16 KiB banks"
+	default 4
+	range 1 256
+	---help---
+		Banks available to the placement tool.  The ROM image is the 32 KiB
+		fixed part followed by this many banks.
+
+config COSMAC_BRS_DEPTH
+	int "Bank return stack depth"
+	default 16
+	range 1 255
+	---help---
+		Maximum nesting of far calls per thread (3 bytes of RAM each per
+		thread).  Overflow causes a PANIC.
+
+endif # COSMAC_BANKING
+
 endif # ARCH_COSMAC

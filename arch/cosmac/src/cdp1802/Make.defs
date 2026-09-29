@@ -32,6 +32,11 @@ CMN_CSRCS += cosmac_initialize.c cosmac_initialstate.c cosmac_irq.c
 CMN_CSRCS += cosmac_nputs.c cosmac_registerdump.c cosmac_stackframe.c
 CMN_CSRCS += cosmac_stubs.c
 
+ifeq ($(CONFIG_COSMAC_BANKING),y)
+CMN_ASRCS += cosmac_farcall.S
+CMN_CSRCS += cosmac_banking.c
+endif
+
 # CDP1802 chip files
 
 CHIP_ASRCS =
