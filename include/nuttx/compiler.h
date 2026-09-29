@@ -585,6 +585,25 @@
 #      define CONFIG_PTR_IS_NOT_INT 1
 #    endif
 
+#  elif defined(__CDP1802__)
+
+/* No I-space access qualifiers */
+
+#    define IOBJ
+#    define IPTR
+
+/* Select the small, 16-bit addressing model */
+
+#    define CONFIG_SMALL_MEMORY 1
+
+/* int is 16-bits, long is 32-bits */
+
+#    define CONFIG_LONG_IS_NOT_INT 1
+
+/* Pointers and int are the same size (16-bits) */
+
+#    undef  CONFIG_PTR_IS_NOT_INT
+
 #  elif defined(_EZ80ACCLAIM)
 
 /* No I-space access qualifiers */
