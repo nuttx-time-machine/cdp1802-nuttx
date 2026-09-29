@@ -64,6 +64,10 @@
 	.global	cosmac_doirq
 	.global	cosmac_ncrt_call
 	.global	cosmac_ncrt_ret
+#ifdef CONFIG_COSMAC_IRQSTATE_SWFLAG
+	.global	g_cosmac_ie
+#endif
+
 	.text
 
 /****************************************************************************
@@ -78,6 +82,22 @@
 
 	.type	cosmac_irq_exit, @function
 cosmac_irq_exit:
+#ifdef CONFIG_COSMAC_IRQSTATE_SWFLAG
+	/* g_cosmac_ie := the IE this frame resumes with */
+
+	glo	2
+	adi	REG_IE
+	plo	7
+	ghi	2
+	adci	0
+	phi	7
+	ldi	%hi(g_cosmac_ie)
+	phi	6
+	ldi	%lo(g_cosmac_ie)
+	plo	6
+	ldn	7
+	str	6
+#endif
 	out	6			/* I/O buffer; R2 -> R15 */
 	lda	2
 	phi	15
@@ -211,6 +231,15 @@ cosmac_irq_entry:
 	stxd
 	inp	6			/* I/O buffer -> M(R2) */
 	dec	2			/* R2: free byte below the frame */
+
+#ifdef CONFIG_COSMAC_IRQSTATE_SWFLAG
+	ldi	%hi(g_cosmac_ie)	/* IE is 0 now */
+	phi	6
+	ldi	%lo(g_cosmac_ie)
+	plo	6
+	ldi	0
+	str	6
+#endif
 
 	/* NCRT registers for the C code */
 

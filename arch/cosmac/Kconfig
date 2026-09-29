@@ -38,9 +38,9 @@ config COSMAC_IRQSTATE_LSIE
 config COSMAC_IRQSTATE_SWFLAG
 	bool "Software interrupt-enable flag"
 	---help---
-		Keep a copy of IE in RAM instead of reading it with LSIE.  Every
-		interrupt entry/exit and context switch keeps the copy in step with
-		the hardware.  Implemented in Step 07.
+		Keep a copy of IE in RAM (g_cosmac_ie) instead of reading it
+		with LSIE.  up_irq_save/restore/enable and the interrupt entry and
+		exit keep the copy equal to IE; changing IE still takes DIS/RET.
 
 endchoice # Interrupt enable state
 
