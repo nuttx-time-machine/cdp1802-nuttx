@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_stubs.c
+ * arch/cosmac/src/common/cosmac_registerdump.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,14 +20,6 @@
  *
  ****************************************************************************/
 
-/* STEP 04 STUBS: the architecture interfaces that NuttX common code needs
- * in order to link, each one PANIC()ing (or doing nothing, where doing
- * nothing is a correct minimal implementation).  They exist only for the
- * size-feasibility measurement; Steps 05-09 replace them with real code.
- * The list was produced by the linker: see docs/journal/step-04.md in the
- * meta repository.
- */
-
 /****************************************************************************
  * Included Files
  ****************************************************************************/
@@ -35,67 +27,53 @@
 #include <nuttx/config.h>
 
 #include <stdint.h>
-#include <string.h>
+#include <debug.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
 
 /****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static unsigned int reg16(FAR const uint8_t *regs, int n)
+{
+  return ((unsigned int)regs[REG_R(n)] << 8) | regs[REG_R(n) + 1];
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-/* Board hooks and low-level console (the board provides them next) */
+/****************************************************************************
+ * Name: up_dump_register
+ *
+ * Description:
+ *   Dump a saved register context (struct xcptcontext::regs, layout in
+ *   arch/cosmac/include/irq.h) after an assertion or crash.
+ *
+ ****************************************************************************/
 
-void board_late_initialize(void)
+void up_dump_register(FAR void *dumpregs)
 {
-}
+  FAR const uint8_t *regs = dumpregs != NULL ?
+                            (FAR const uint8_t *)dumpregs :
+                            (FAR const uint8_t *)up_current_regs();
+  int n;
 
-void up_putc(int ch)
-{
-}
+  if (regs == NULL)
+    {
+      return;
+    }
 
-/* Timer (Step 07) */
+  _alert("XP:%02x D:%02x DF:%u IE:%u\n", regs[REG_XP], regs[REG_D],
+         regs[REG_DF] & 1, regs[REG_IE] & 1);
 
-void up_timer_initialize(void)
-{
-}
-
-/* Threads and context switching (Step 08) */
-
-int up_create_stack(FAR struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
-{
-  PANIC();
-  return -1;
-}
-
-int up_use_stack(FAR struct tcb_s *tcb, FAR void *stack, size_t stack_size)
-{
-  PANIC();
-  return -1;
-}
-
-void up_release_stack(FAR struct tcb_s *dtcb, uint8_t ttype)
-{
-  PANIC();
-}
-
-void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb)
-{
-  PANIC();
-}
-
-/* up_saveusercontext() runs inside _assert(), so it must never PANIC():
- * until Step 08 defines the register frame it records a zeroed context.
- */
-
-int up_saveusercontext(FAR void *saveregs)
-{
-  memset(saveregs, 0, XCPTCONTEXT_SIZE);
-  return 0;
-}
-
-void up_exit(int status)
-{
-  PANIC();
-  for (; ; );
+  for (n = 1; n <= 15; n += 4)
+    {
+      _alert("R%-2d %04x %04x %04x %04x\n", n, reg16(regs, n),
+             n + 1 <= 15 ? reg16(regs, n + 1) : 0,
+             n + 2 <= 15 ? reg16(regs, n + 2) : 0,
+             n + 3 <= 15 ? reg16(regs, n + 3) : 0);
+    }
 }

@@ -27,7 +27,10 @@ HEAD_ASRC = cdp1802_head.S
 # Common COSMAC files
 
 CMN_ASRCS  = cosmac_irqsave.S cosmac_ncrt.S
-CMN_CSRCS  = cosmac_div64.c cosmac_stubs.c
+CMN_CSRCS  = cosmac_allocateheap.c cosmac_div64.c cosmac_idle.c
+CMN_CSRCS += cosmac_initialize.c cosmac_initialstate.c cosmac_irq.c
+CMN_CSRCS += cosmac_nputs.c cosmac_registerdump.c cosmac_stackframe.c
+CMN_CSRCS += cosmac_stubs.c
 
 # CDP1802 chip files
 

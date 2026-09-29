@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_stubs.c
+ * arch/cosmac/src/common/cosmac_stackframe.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,14 +20,6 @@
  *
  ****************************************************************************/
 
-/* STEP 04 STUBS: the architecture interfaces that NuttX common code needs
- * in order to link, each one PANIC()ing (or doing nothing, where doing
- * nothing is a correct minimal implementation).  They exist only for the
- * size-feasibility measurement; Steps 05-09 replace them with real code.
- * The list was produced by the linker: see docs/journal/step-04.md in the
- * meta repository.
- */
-
 /****************************************************************************
  * Included Files
  ****************************************************************************/
@@ -38,64 +30,40 @@
 #include <string.h>
 
 #include <nuttx/arch.h>
-#include <nuttx/irq.h>
+#include <nuttx/sched.h>
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-/* Board hooks and low-level console (the board provides them next) */
+/****************************************************************************
+ * Name: up_stack_frame
+ *
+ * Description:
+ *   Allocate a stack frame in the TCB's stack to hold thread-specific data
+ *   (e.g. the TLS information).  The frame is taken from the low end of the
+ *   stack, the end the stack grows towards but reaches last.  Stacks are
+ *   byte aligned on the CDP1802, so no rounding is needed.
+ *
+ * Returned Value:
+ *   A pointer to the zeroed frame, or NULL if the stack is too small.
+ *
+ ****************************************************************************/
 
-void board_late_initialize(void)
+FAR void *up_stack_frame(FAR struct tcb_s *tcb, size_t frame_size)
 {
-}
+  FAR void *ret;
 
-void up_putc(int ch)
-{
-}
+  if (tcb->stack_alloc_ptr == NULL || tcb->adj_stack_size <= frame_size)
+    {
+      return NULL;
+    }
 
-/* Timer (Step 07) */
+  ret = tcb->stack_base_ptr;
+  memset(ret, 0, frame_size);
 
-void up_timer_initialize(void)
-{
-}
+  tcb->stack_base_ptr  = (FAR uint8_t *)tcb->stack_base_ptr + frame_size;
+  tcb->adj_stack_size -= frame_size;
 
-/* Threads and context switching (Step 08) */
-
-int up_create_stack(FAR struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
-{
-  PANIC();
-  return -1;
-}
-
-int up_use_stack(FAR struct tcb_s *tcb, FAR void *stack, size_t stack_size)
-{
-  PANIC();
-  return -1;
-}
-
-void up_release_stack(FAR struct tcb_s *dtcb, uint8_t ttype)
-{
-  PANIC();
-}
-
-void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb)
-{
-  PANIC();
-}
-
-/* up_saveusercontext() runs inside _assert(), so it must never PANIC():
- * until Step 08 defines the register frame it records a zeroed context.
- */
-
-int up_saveusercontext(FAR void *saveregs)
-{
-  memset(saveregs, 0, XCPTCONTEXT_SIZE);
-  return 0;
-}
-
-void up_exit(int status)
-{
-  PANIC();
-  for (; ; );
+  return ret;
 }

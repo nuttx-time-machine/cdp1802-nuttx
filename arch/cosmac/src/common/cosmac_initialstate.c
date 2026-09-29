@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/cosmac/src/common/cosmac_stubs.c
+ * arch/cosmac/src/common/cosmac_initialstate.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,82 +20,54 @@
  *
  ****************************************************************************/
 
-/* STEP 04 STUBS: the architecture interfaces that NuttX common code needs
- * in order to link, each one PANIC()ing (or doing nothing, where doing
- * nothing is a correct minimal implementation).  They exist only for the
- * size-feasibility measurement; Steps 05-09 replace them with real code.
- * The list was produced by the linker: see docs/journal/step-04.md in the
- * meta repository.
- */
-
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
 
-#include <stdint.h>
 #include <string.h>
 
 #include <nuttx/arch.h>
-#include <nuttx/irq.h>
+#include <nuttx/sched.h>
+
+#include "cosmac_internal.h"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-/* Board hooks and low-level console (the board provides them next) */
+/****************************************************************************
+ * Name: up_initial_state
+ *
+ * Description:
+ *   A new thread is being started and a new TCB has been created.  This
+ *   function is called to initialize the processor specific portions of
+ *   the new TCB.
+ *
+ *   Step 06: only the idle thread, which already runs on the stack set up by
+ *   the reset code.  The initial register frame of other threads is
+ *   defined in Step 08 (docs/cdp1802/context.md).
+ *
+ ****************************************************************************/
 
-void board_late_initialize(void)
+void up_initial_state(FAR struct tcb_s *tcb)
 {
-}
+  FAR struct xcptcontext *xcp = &tcb->xcp;
 
-void up_putc(int ch)
-{
-}
+  if (tcb->pid == IDLE_PROCESS_ID)
+    {
+      FAR char *stack = (FAR char *)(g_idle_topstack -
+                                     CONFIG_IDLETHREAD_STACKSIZE);
 
-/* Timer (Step 07) */
+      tcb->stack_alloc_ptr = stack;
+      tcb->stack_base_ptr  = stack;
+      tcb->adj_stack_size  = CONFIG_IDLETHREAD_STACKSIZE;
+    }
+  else
+    {
+      PANIC();              /* Step 08 */
+    }
 
-void up_timer_initialize(void)
-{
-}
-
-/* Threads and context switching (Step 08) */
-
-int up_create_stack(FAR struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
-{
-  PANIC();
-  return -1;
-}
-
-int up_use_stack(FAR struct tcb_s *tcb, FAR void *stack, size_t stack_size)
-{
-  PANIC();
-  return -1;
-}
-
-void up_release_stack(FAR struct tcb_s *dtcb, uint8_t ttype)
-{
-  PANIC();
-}
-
-void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb)
-{
-  PANIC();
-}
-
-/* up_saveusercontext() runs inside _assert(), so it must never PANIC():
- * until Step 08 defines the register frame it records a zeroed context.
- */
-
-int up_saveusercontext(FAR void *saveregs)
-{
-  memset(saveregs, 0, XCPTCONTEXT_SIZE);
-  return 0;
-}
-
-void up_exit(int status)
-{
-  PANIC();
-  for (; ; );
+  memset(xcp, 0, sizeof(struct xcptcontext));
 }
