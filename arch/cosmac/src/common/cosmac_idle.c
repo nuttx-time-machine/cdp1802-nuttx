@@ -36,13 +36,15 @@
  * Name: up_idle
  *
  * Description:
- *   Called repeatedly by the idle loop.  Step 06: return immediately (a
- *   busy idle loop).  Once the timer interrupt exists (Step 07), this
- *   executes IDL, which waits for the next interrupt; with interrupts
- *   disabled IDL would never wake up.
+ *   Called repeatedly by the idle loop, with interrupts enabled.  IDL
+ *   stops the CPU until the next interrupt or DMA request (RCA MPM-201A
+ *   instruction summary, pp. 99-105); the simulator skips the idle cycles
+ *   to the next timer event.
+ *   A board can provide its own up_idle() with CONFIG_ARCH_IDLE_CUSTOM.
  *
  ****************************************************************************/
 
 void up_idle(void)
 {
+  __asm__ __volatile__("idl");
 }

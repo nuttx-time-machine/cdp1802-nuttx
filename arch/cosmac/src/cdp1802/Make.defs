@@ -28,9 +28,13 @@ HEAD_ASRC = cdp1802_head.S
 
 CMN_ASRCS  = cosmac_irqentry.S cosmac_irqsave.S cosmac_ncrt.S
 CMN_CSRCS  = cosmac_allocateheap.c cosmac_div64.c cosmac_doirq.c
-CMN_CSRCS += cosmac_idle.c cosmac_initialize.c cosmac_initialstate.c
-CMN_CSRCS += cosmac_irq.c cosmac_nputs.c cosmac_registerdump.c
-CMN_CSRCS += cosmac_stackframe.c cosmac_stubs.c
+CMN_CSRCS += cosmac_initialize.c cosmac_initialstate.c cosmac_irq.c
+CMN_CSRCS += cosmac_nputs.c cosmac_registerdump.c cosmac_stackframe.c
+CMN_CSRCS += cosmac_stubs.c
+
+ifneq ($(CONFIG_ARCH_IDLE_CUSTOM),y)
+CMN_CSRCS += cosmac_idle.c
+endif
 
 ifeq ($(CONFIG_COSMAC_BANKING),y)
 CMN_ASRCS += cosmac_farcall.S
