@@ -40,6 +40,17 @@ config BOARD_SIM1802_PROFILE_SIM64
 
 endchoice # Memory profile
 
+config SIM1802_UART0
+	bool "Console as a serial device (UART0, /dev/ttyS0)"
+	default n
+	select UART0_SERIALDRIVER
+	select SERIAL_IFLOWCONTROL
+	---help---
+		The simulator console through NuttX's serial driver: buffered,
+		interrupt-driven input (IRQ 6) with flow control, and the
+		/dev/console device when UART0 is the serial console.  Without it,
+		the console is syslog output only (CONFIG_CONSOLE_SYSLOG).
+
 config BOARD_SIM1802_CLOCK_HZ
 	int "Nominal CPU clock (Hz)"
 	default 4000000
