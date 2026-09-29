@@ -56,6 +56,7 @@ config ARCH_COSMAC
 	bool "COSMAC"
 	select ARCH_TOOLCHAIN_GCC
 	select ARCH_HAVE_CUSTOMOPT
+	select ARCH_HAVE_STACKCHECK
 	---help---
 		RCA COSMAC 8-bit architectures (CDP1802).
 

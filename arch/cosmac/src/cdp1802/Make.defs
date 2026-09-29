@@ -28,7 +28,8 @@ HEAD_ASRC = cdp1802_head.S
 
 CMN_ASRCS  = cosmac_irqentry.S cosmac_irqsave.S cosmac_ncrt.S
 CMN_ASRCS += cosmac_doswitch.S
-CMN_CSRCS  = cosmac_allocateheap.c cosmac_createstack.c cosmac_div64.c
+CMN_CSRCS  = cosmac_allocateheap.c cosmac_checkstack.c cosmac_createstack.c
+CMN_CSRCS += cosmac_div64.c
 CMN_CSRCS += cosmac_doirq.c cosmac_exit.c cosmac_initialize.c
 CMN_CSRCS += cosmac_initialstate.c cosmac_irq.c cosmac_nputs.c
 CMN_CSRCS += cosmac_registerdump.c cosmac_stackframe.c cosmac_stubs.c
