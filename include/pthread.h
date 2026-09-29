@@ -271,7 +271,7 @@ struct pthread_cond_s
 {
   sem_t sem;
   clockid_t clockid;
-  int wait_count;
+  int32_t wait_count;     /* Accessed as atomic_t (32 bits) */
 };
 
 #ifndef __PTHREAD_COND_T_DEFINED

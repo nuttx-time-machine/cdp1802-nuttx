@@ -67,7 +67,7 @@ int pthread_cond_broadcast(FAR pthread_cond_t *cond)
     }
   else
     {
-      int wcnt = atomic_read(COND_WAIT_COUNT(cond));
+      int32_t wcnt = atomic_read(COND_WAIT_COUNT(cond));
 
       /* Loop until all of the waiting threads have been restarted. */
 
