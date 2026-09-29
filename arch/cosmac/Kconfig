@@ -67,7 +67,7 @@ config COSMAC_BANK_PORT
 
 config COSMAC_BANK_COUNT
 	int "Number of 16 KiB banks"
-	default 4
+	default 8
 	range 1 256
 	---help---
 		Banks available to the placement tool.  The ROM image is the 32 KiB
