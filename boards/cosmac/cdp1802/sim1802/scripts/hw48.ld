@@ -20,7 +20,7 @@
  *
  ****************************************************************************/
 
-/* HW48/16 profile (ADR 0011): 48 KiB ROM at the reset vector 0x0000, 16 KiB
+/* HW48/16 profile (ADR 0012): 48 KiB ROM at the reset vector 0x0000, 16 KiB
  * RAM at 0xC000.  nuttx.bin (objcopy -O binary) is the ROM image; .data is
  * copied from ROM to RAM by the reset code.
  */
