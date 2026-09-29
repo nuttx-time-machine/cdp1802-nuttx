@@ -40,9 +40,13 @@ banks by placement rules, and writes:
   function pointers -- goes through the stub;
 - a report.
 
-An object stays in fixed ROM when banking it would be unsafe: it takes the
-address of one of its own functions (the pointer would bypass the stub), it
-has code outside .text*, or it defines a symbol that is also defined
+An object that takes the address of one of its own functions (a table of
+static functions, a callback) would hand out a pointer into its bank; the
+tool rewrites such references (ELF symbol table and relocations) to go
+through a stub too: the function's own stub for a global function, so that
+pointers compare equal everywhere, or a generated one (__cosmac_ptr_N ->
+__cosmac_fn_N) for a static function.  An object stays in fixed ROM only
+when it has code outside .text* or defines a symbol that is also defined
 elsewhere.  A reference is a *call* when it is the 16-bit operand of
 "sep 4" (the NCRT call) or of a long branch (a tail call); every other
 reference to a function is an address.
@@ -50,7 +54,8 @@ reference to a function is an address.
 Placement rules (first match wins; unmatched objects stay fixed):
     <bank>|auto|fixed   <archive-glob>:<member-glob>
 Plain objects match as "-:<file name>".  "auto" packs objects, largest
-first, into the first bank with room.  Object sizes come from the map of a
+first, into the first bank with room; an object that does not fit any bank
+as a whole is split, function (code section) by function.  Object sizes come from the map of a
 flat link (--map) when given: only code that survives --gc-sections counts,
 and objects that are not linked at all are left alone.
 """
@@ -165,6 +170,62 @@ class ElfObject:
     def byte_at(self, index, off):
         return self.data[self.sections[index]["off"] + off]
 
+    def relocations_at(self):
+        """Like relocations(), with the RELA section index and entry number
+        first: (rela, entry, section, offset, type, symbol, addend)."""
+        for r, s in enumerate(self.sections):
+            if s["type"] != SHT_RELA:
+                continue
+            target = s["info"]
+            if not self.sections[target]["flags"] & SHF_ALLOC:
+                continue
+            for i in range(s["size"] // 12):
+                o = s["off"] + i * 12
+                off, info, addend = struct.unpack(
+                    self.en + "IIi", self.data[o : o + 12]
+                )
+                yield r, i, target, off, info & 0xFF, self.symbols[info >> 8], addend
+
+    def rewrite(self, new_symbols, redirects):
+        """Return a copy of the object with global symbols appended and some
+        relocations pointed at them.
+
+        new_symbols: [(name, value, section index or 0, is_function)];
+        redirects: {(rela section, entry): (new symbol number, addend)},
+        where new symbol number n refers to new_symbols[n].  The appended
+        .symtab, .strtab and changed RELA sections go at the end of the
+        file; their section headers are updated, nothing else moves.
+        """
+        en, d = self.en, bytearray(self.data)
+        symtab = next(i for i, s in enumerate(self.sections) if s["type"] == SHT_SYMTAB)
+        strtab = self.sections[symtab]["link"]
+        first_new = len(self.symbols)
+        strs = bytearray(self.contents_of(strtab))
+        syms = bytearray(self.contents_of(symtab))
+        for name, value, shndx, func in new_symbols:
+            info = (STB_GLOBAL << 4) | (STT_FUNC if func else STT_NOTYPE)
+            syms += struct.pack(en + "IIIBBH", len(strs), value, 0, info, 0, shndx)
+            strs += name.encode() + b"\0"
+        blobs = {symtab: bytes(syms), strtab: bytes(strs)}
+        for (rela, entry), (n, addend) in redirects.items():
+            if rela not in blobs:
+                blobs[rela] = bytearray(self.contents_of(rela))
+            off, info = struct.unpack_from(en + "II", blobs[rela], entry * 12)
+            info = ((first_new + n) << 8) | (info & 0xFF)
+            struct.pack_into(en + "IIi", blobs[rela], entry * 12, off, info, addend)
+        (shoff,) = struct.unpack_from(en + "I", d, 0x20)
+        (shentsize,) = struct.unpack_from(en + "H", d, 0x2E)
+        for index, blob in sorted(blobs.items()):
+            d += b"\0" * (-len(d) % 4)
+            hdr = shoff + index * shentsize
+            struct.pack_into(en + "II", d, hdr + 16, len(d), len(blob))
+            d += blob
+        return bytes(d)
+
+    def contents_of(self, index):
+        s = self.sections[index]
+        return self.data[s["off"] : s["off"] + s["size"]]
+
 
 def read_archive(path):
     """Return the members of an ar archive as a list of (name, bytes)."""
@@ -196,6 +257,18 @@ def read_archive(path):
 # Analysis ##################################################################
 
 
+class Ref:
+    """One relocation in an allocated section of a unit."""
+
+    __slots__ = ("rela", "entry", "sec", "call", "name", "tsec", "toff")
+
+    def __init__(self, rela, entry, sec, call, name, tsec, toff):
+        self.rela, self.entry, self.sec, self.call = rela, entry, sec, call
+        self.name = name  # global name, or None for a local target
+        self.tsec = tsec  # code section of a target in this unit, or None
+        self.toff = toff  # offset of that target in its section
+
+
 class Unit:
     """One object file of the link (an archive member or a plain object)."""
 
@@ -203,13 +276,13 @@ class Unit:
         self.archive = archive  # archive basename, or "-" for plain objects
         self.member = member
         self.elf = ElfObject(data, "%s:%s" % (archive, member))
-        self.bank = None  # None = fixed
         self.why_fixed = None
-        self.size = 0
-        self.defined = {}  # global function name -> bind
-        self.calls = set()  # names called
-        self.addresses = set()  # names whose address is taken
-        self.own_address = False  # takes the address of its own function
+        self.split = False  # its code sections are in different regions
+        self.code = {}  # code section index -> size (kept code)
+        self.secbank = {}  # code section index -> bank (absent: fixed)
+        self.defined = {}  # global function name -> (bind, section index)
+        self.starts = {}  # code section index -> {function start offsets}
+        self.refs = []
         self.foreign_code = False  # code outside .text*
         self._analyse()
 
@@ -217,46 +290,67 @@ class Unit:
     def key(self):
         return "%s:%s" % (self.archive, self.member)
 
+    @property
+    def size(self):
+        return sum(self.code.values())
+
+    @property
+    def banked(self):
+        return bool(self.secbank)
+
     def _analyse(self):
         e = self.elf
-        starts = {}  # code section index -> {function start offsets}
-        for sym in e.symbols:
-            if sym["shndx"] == SHN_UNDEF or sym["shndx"] >= 0xFF00:
-                continue
-            if not e.is_code(sym["shndx"]):
-                continue
-            if sym["type"] in (STT_FUNC, STT_NOTYPE) and sym["name"]:
-                starts.setdefault(sym["shndx"], set()).add(sym["value"])
-                if sym["bind"] in (STB_GLOBAL, STB_WEAK):
-                    self.defined[sym["name"]] = sym["bind"]
         for i, s in enumerate(e.sections):
             if e.is_code(i) and s["size"]:
-                self.size += s["size"]
+                self.code[i] = s["size"]
                 if not (s["name"] == ".text" or s["name"].startswith(".text.")):
                     self.foreign_code = True
-        for sec, off, typ, sym, addend in e.relocations():
+        for sym in e.symbols:
+            x = sym["shndx"]
+            if x == SHN_UNDEF or x >= 0xFF00 or not e.is_code(x):
+                continue
+            if sym["type"] in (STT_FUNC, STT_NOTYPE) and sym["name"]:
+                self.starts.setdefault(x, set()).add(sym["value"])
+                if sym["bind"] in (STB_GLOBAL, STB_WEAK):
+                    self.defined[sym["name"]] = (sym["bind"], x)
+        for rela, entry, sec, off, typ, sym, addend in e.relocations_at():
             call = (
                 typ == R_CDP1802_16
                 and e.is_code(sec)
                 and off > 0
                 and e.byte_at(sec, off - 1) in CALL_OPCODES
             )
-            if sym["shndx"] == SHN_UNDEF:
+            x = sym["shndx"]
+            if x == SHN_UNDEF:
                 if sym["name"]:
-                    (self.calls if call else self.addresses).add(sym["name"])
+                    self.refs.append(Ref(rela, entry, sec, call, sym["name"], None, 0))
                 continue
-            if sym["shndx"] >= 0xFF00 or not e.is_code(sym["shndx"]):
-                continue
-            # A reference into this object's own code
-            if sym["type"] == STT_SECTION:
-                target = addend
-            else:
-                target = sym["value"] + addend
-            if call:
-                if sym["type"] != STT_SECTION and sym["bind"] != STB_LOCAL:
-                    self.calls.add(sym["name"])
-            elif target == 0 or target in starts.get(sym["shndx"], ()):
-                self.own_address = True
+            if x >= 0xFF00 or not e.is_code(x):
+                continue  # data, absolute
+            toff = addend if sym["type"] == STT_SECTION else sym["value"] + addend
+            if toff != 0 and toff not in self.starts.get(x, ()):
+                continue  # a label inside a function: same section only
+            glob = sym["type"] != STT_SECTION and sym["bind"] != STB_LOCAL
+            name = sym["name"] if glob else None
+            self.refs.append(Ref(rela, entry, sec, call, name, x, toff))
+
+    def bank_of_section(self, sec):
+        return self.secbank.get(sec)
+
+    def function_at(self, shndx, value):
+        """(name, is_global) of the function symbol at a code location."""
+        best = None
+        for sym in self.elf.symbols:
+            if (
+                sym["shndx"] == shndx
+                and sym["value"] == value
+                and sym["type"] in (STT_FUNC, STT_NOTYPE)
+                and sym["name"]
+            ):
+                if sym["bind"] in (STB_GLOBAL, STB_WEAK):
+                    return sym["name"], True
+                best = best or sym["name"]
+        return best or self.elf.sections[shndx]["name"], False
 
 
 def parse_rules(path):
@@ -293,7 +387,7 @@ MAP_CONT = re.compile(r"^\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)\s+(\S.*)$")
 
 
 def map_sizes(path):
-    """Code bytes per archive member / object kept in a GNU ld map."""
+    """{unit key: {code section name: bytes}} kept in a GNU ld map."""
     sizes = {}
     lines = open(path).read().split("\n")
     try:
@@ -304,10 +398,10 @@ def map_sizes(path):
     for line in lines[start:]:
         m = MAP_SECTION.match(line)
         if m:
-            size, where = int(m.group(3), 16), m.group(4)
+            name, size, where = m.group(1), int(m.group(3), 16), m.group(4)
         elif pending and MAP_CONT.match(line):
-            m = MAP_CONT.match(line)
-            size, where = int(m.group(2), 16), m.group(3)
+            c = MAP_CONT.match(line)
+            name, size, where = pending.group(1), int(c.group(2), 16), c.group(3)
         else:
             pending = MAP_NAME_ONLY.match(line)
             continue
@@ -318,7 +412,8 @@ def map_sizes(path):
             if m
             else "-:%s" % os.path.basename(where)
         )
-        sizes[key] = sizes.get(key, 0) + size
+        secs = sizes.setdefault(key, {})
+        secs[name] = secs.get(name, 0) + size
     return sizes
 
 
@@ -340,8 +435,6 @@ def read_inputs(paths):
 
 def why_fixed(u, definitions):
     """The reason a unit cannot be banked, or None."""
-    if u.own_address:
-        return "takes the address of its own function"
     if u.foreign_code:
         return "has code outside .text*"
     dup = [n for n in u.defined if len(definitions[n]) > 1]
@@ -350,8 +443,42 @@ def why_fixed(u, definitions):
     return None
 
 
+def apply_sizes(units, sizes):
+    """Keep only the code a flat link keeps, with its sizes."""
+    for u in units:
+        if sizes is None:
+            continue
+        kept = sizes.get(u.key, {})
+        names = {i: u.elf.sections[i]["name"] for i in u.code}
+        u.code = {i: kept[n] for i, n in names.items() if kept.get(n)}
+
+
+def place(u, bank, used):
+    for sec in u.code:
+        u.secbank[sec] = bank
+    used[bank] += u.size
+
+
+def place_split(u, used, capacity, log):
+    """Place the code sections of u one by one (first fit, largest first);
+    what does not fit stays fixed."""
+    u.split = True
+    for sec, size in sorted(u.code.items(), key=lambda kv: -kv[1]):
+        for b in range(len(used)):
+            if used[b] + size <= capacity:
+                u.secbank[sec] = b
+                used[b] += size
+                break
+        else:
+            log.append(
+                "fixed: %s %s (%d bytes: no bank has room)"
+                % (u.key, u.elf.sections[sec]["name"], size)
+            )
+
+
 def assign_banks(units, rules, sizes, args, log):
-    """Set u.bank for every unit; return the bytes used per bank."""
+    """Place every unit's code sections; return the bytes used per bank."""
+    apply_sizes(units, sizes)
     definitions = {}
     for u in units:
         for name in u.defined:
@@ -359,8 +486,6 @@ def assign_banks(units, rules, sizes, args, log):
     used = [0] * args.banks
     autos = []
     for u in units:
-        if sizes is not None:
-            u.size = sizes.get(u.key, 0)
         where = match_rule(rules, u)
         if where == "fixed" or u.size == 0:
             continue  # fixed by rule, no code, or not linked
@@ -372,53 +497,112 @@ def assign_banks(units, rules, sizes, args, log):
         elif not 0 <= where < args.banks:
             raise SystemExit("%s: bank %d out of range" % (u.key, where))
         else:
-            u.bank = where
-            used[where] += u.size
+            place(u, where, used)
     capacity = args.bank_size - args.reserve
+    split = []
     for u in sorted(autos, key=lambda u: -u.size):
-        for b in range(args.banks):
-            if used[b] + u.size <= capacity:
-                u.bank = b
-                used[b] += u.size
-                break
+        b = next((b for b in range(args.banks) if used[b] + u.size <= capacity), None)
+        if b is None:
+            split.append(u)  # too big for any bank's free space as a whole
         else:
-            log.append("fixed: %s (%d bytes: no bank has room)" % (u.key, u.size))
+            place(u, b, used)
+    for u in split:
+        place_split(u, used, capacity, log)
     return used
 
 
 # Output #####################################################################
 
 
-def bank_object(u, f, bank_of, objcopy):
-    """Rename the code sections and the same-bank functions of object f."""
-    rename = sorted(
-        n
-        for n in (set(u.defined) | u.calls)
-        if bank_of.get(n) == u.bank and n not in u.addresses
-    )
+def plan_references(u, bank_of):
+    """Decide how each reference of a banked unit reaches its target.
+
+    Returns (renamed, stubbed): renamed is the set of names the object
+    refers to directly under __bank_<name> (its banked definitions and the
+    banked functions it calls from the same bank); stubbed lists the
+    references that must go through a stub although the name they use is
+    renamed in this object, or that point at a static function.
+    """
+    renamed = {n for n, (b, sec) in u.defined.items() if sec in u.secbank}
+    decisions = []
+    for r in u.refs:
+        tb = u.secbank.get(r.tsec) if r.tsec is not None else bank_of.get(r.name)
+        if tb is None:
+            continue  # fixed target: always direct
+        fb = u.secbank.get(r.sec) if u.elf.is_code(r.sec) else "data"
+        direct = r.call and fb == tb
+        if direct and r.name is not None:
+            renamed.add(r.name)
+        decisions.append((r, direct, tb))
+    stubbed = [
+        (r, tb)
+        for r, direct, tb in decisions
+        if not direct and (r.name is None or r.name in renamed)
+    ]
+    return renamed, stubbed
+
+
+def rewrite_references(u, f, stubbed, counter):
+    """Point the references in stubbed at stubs: a global function's own
+    stub (via a placeholder renamed back to its name, so that pointers
+    compare equal everywhere) or a generated one for a static function.
+    Rewrites file f; returns the placeholder renames and extra stubs."""
+    new_symbols, redirects, renames, stubs = [], {}, [], []
+    targets = {}
+    for r, tb in stubbed:
+        key = (r.tsec, r.toff) if r.name is None else r.name
+        if key not in targets:
+            if r.name is not None:
+                ref = "__cosmac_ref_%s" % r.name
+                renames.append((ref, r.name))
+            else:
+                counter[0] += 1
+                fn = "__cosmac_fn_%d" % counter[0]
+                ref = "__cosmac_ptr_%d" % counter[0]
+                new_symbols.append((fn, r.toff, r.tsec, True))
+                stubs.append((ref, fn, STB_GLOBAL, tb))
+            targets[key] = len(new_symbols)
+            new_symbols.append((ref, 0, SHN_UNDEF, False))
+        redirects[(r.rela, r.entry)] = (targets[key], 0)
+    if redirects:
+        open(f, "wb").write(u.elf.rewrite(new_symbols, redirects))
+    return renames, stubs
+
+
+def bank_object(u, f, bank_of, objcopy, counter):
+    """Write the banked form of object f; return the stubs it needs."""
+    renamed, stubbed = plan_references(u, bank_of)
+    renames, stubs = rewrite_references(u, f, stubbed, counter)
     symfile = f + ".syms"
     with open(symfile, "w") as sf:
-        for n in rename:
+        for n in sorted(renamed):
             sf.write("%s %s%s\n" % (n, PREFIX, n))
+        for old_name, new_name in renames:
+            sf.write("%s %s\n" % (old_name, new_name))
     cmd = [objcopy, "--redefine-syms", symfile]
-    for s in u.elf.sections:
-        n = s["name"]
-        if n == ".text" or n.startswith(".text."):
-            cmd += ["--rename-section", "%s=.bank%d%s" % (n, u.bank, n)]
+    for sec, bank in sorted(u.secbank.items()):
+        n = u.elf.sections[sec]["name"]
+        cmd += ["--rename-section", "%s=.bank%d%s" % (n, bank, n)]
     subprocess.check_call(cmd + [f])
+    for n, (bind, sec) in sorted(u.defined.items()):
+        if sec in u.secbank:
+            stubs.append((n, PREFIX + n, bind, u.secbank[sec]))
+    u.redirected = len(stubbed)
+    return stubs
 
 
 def write_libraries(inputs, units, args):
     """Write the (partly banked) copies of the inputs; return the stubs."""
     bank_of = {}
     for u in units:
-        if u.bank is not None:
-            for name in u.defined:
-                bank_of[name] = u.bank
+        for name, (bind, sec) in u.defined.items():
+            if sec in u.secbank:
+                bank_of[name] = u.secbank[sec]
     if os.path.isdir(args.outdir):
         shutil.rmtree(args.outdir)
     os.makedirs(args.outdir)
     stubs = []
+    counter = [0]
     for path, us in inputs:
         base = os.path.basename(path)
         work = os.path.join(args.outdir, base + ".d")
@@ -428,9 +612,8 @@ def write_libraries(inputs, units, args):
             os.makedirs(d)
             f = os.path.join(d, u.member)
             open(f, "wb").write(u.elf.data)
-            if u.bank is not None:
-                bank_object(u, f, bank_of, args.objcopy)
-                stubs += [(n, b, u.bank) for n, b in sorted(u.defined.items())]
+            if u.banked:
+                stubs += bank_object(u, f, bank_of, args.objcopy, counter)
             files.append(f)
         out = os.path.join(args.outdir, base)
         if path.endswith(".a"):
@@ -447,12 +630,12 @@ def write_stubs(path, stubs):
             "/* Generated by tools/cosmac/cosmac_bank.py: far-call "
             "stubs (do not edit) */\n\n"
         )
-        for name, bind, bank in stubs:
+        for name, target, bind, bank in stubs:
             f.write('\t.section .text.stub.%s, "ax"\n' % name)
             f.write("\t.%s\t%s\n" % ("weak" if bind == STB_WEAK else "global", name))
             f.write("\t.type\t%s, @function\n" % name)
             f.write("%s:\n\tsep\t4\n\t.hword\t__cosmac_farcall\n" % name)
-            f.write("\t.hword\t%s%s\n\t.byte\t%d\n" % (PREFIX, name, bank))
+            f.write("\t.hword\t%s\n\t.byte\t%d\n" % (target, bank))
             f.write("\t.size\t%s, .-%s\n\n" % (name, name))
 
 
@@ -480,13 +663,22 @@ def report(units, used, stubs, log, args):
         % (args.banks, args.bank_size, args.reserve)
     ]
     for b in range(args.banks):
-        members = [u for u in units if u.bank == b]
+        members = []
+        for u in units:
+            size = sum(n for sec, n in u.code.items() if u.secbank.get(sec) == b)
+            if size:
+                members.append((size, u.key + (" (split)" if u.split else "")))
         lines.append(
             "bank %d: %d bytes (estimate), %d objects" % (b, used[b], len(members))
         )
-        for u in sorted(members, key=lambda u: -u.size):
-            lines.append("    %6d  %s" % (u.size, u.key))
+        for size, key in sorted(members, reverse=True):
+            lines.append("    %6d  %s" % (size, key))
     lines.append("stubs: %d (%d bytes if all are kept)" % (len(stubs), 6 * len(stubs)))
+    redirected = [u for u in units if getattr(u, "redirected", 0)]
+    lines.append(
+        "references rewritten to go through stubs: %d in %d objects"
+        % (sum(u.redirected for u in redirected), len(redirected))
+    )
     return "\n".join(lines + log) + "\n"
 
 
