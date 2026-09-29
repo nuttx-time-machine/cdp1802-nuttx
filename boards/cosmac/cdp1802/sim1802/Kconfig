@@ -40,6 +40,15 @@ config BOARD_SIM1802_PROFILE_SIM64
 
 endchoice # Memory profile
 
+config BOARD_SIM1802_BOARDCTL
+	bool
+	default y
+	select ARCH_HAVE_POWEROFF
+	select ARCH_HAVE_RESET
+	---help---
+		board_power_off() and board_reset() stop the simulator with the
+		given status (sim1802_boardctl.c).
+
 config SIM1802_UART0
 	bool "Console as a serial device (UART0, /dev/ttyS0)"
 	default n
