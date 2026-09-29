@@ -56,6 +56,14 @@ endif
 
 ARCHOPTIMIZATION += -fomit-frame-pointer
 
+# Workarounds for toolchain bugs (ADR 0010).  Toolchain issue 0002:
+# mikpe's GCC miscompiles some nested calls with 64-bit arguments at -Os
+# unless -fno-split-wide-types is given.  Override with
+# "make COSMAC_GCC_WORKAROUNDS=" to measure or reproduce without it.
+
+COSMAC_GCC_WORKAROUNDS ?= -fno-split-wide-types
+ARCHCFLAGS += $(COSMAC_GCC_WORKAROUNDS)
+
 ARCHCFLAGS += -fno-common
 ARCHCFLAGS += -Wall -Wstrict-prototypes -Wshadow -Wundef -Wno-attributes -Wno-unknown-pragmas
 
