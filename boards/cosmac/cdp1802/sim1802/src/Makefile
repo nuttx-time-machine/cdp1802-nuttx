@@ -28,4 +28,8 @@ ifeq ($(CONFIG_BOARD_SIM1802_TICKTEST),y)
 CSRCS += sim1802_ticktest.c
 endif
 
+ifeq ($(CONFIG_BOARD_SIM1802_THREADTEST),y)
+CSRCS += sim1802_threadtest.c
+endif
+
 include $(TOPDIR)/boards/Board.mk

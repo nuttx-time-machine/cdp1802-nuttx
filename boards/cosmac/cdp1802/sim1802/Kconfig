@@ -58,4 +58,14 @@ config BOARD_SIM1802_TICKTEST
 		cycle counts between callbacks and the cost of a timer interrupt,
 		then halts the simulator.  Not for normal use.
 
+config BOARD_SIM1802_THREADTEST
+	bool "Thread, preemption and signal test (init task entry point)"
+	default n
+	depends on ENABLE_ALL_SIGNALS
+	---help---
+		Test code for the port's Step 08: set CONFIG_INIT_ENTRYPOINT to
+		"sim1802_threadtest_main".  Round-robin preemption, semaphores,
+		usleep(), signals to blocked and running tasks, the cost of a
+		context switch, then the simulator halts.  Not for normal use.
+
 endif # ARCH_BOARD_SIM1802
