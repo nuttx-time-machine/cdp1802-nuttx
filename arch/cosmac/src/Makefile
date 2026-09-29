@@ -91,11 +91,50 @@ libarch$(LIBEXT): $(OBJS)
 board/libboard$(LIBEXT):
 	$(Q) $(MAKE) -C board libboard$(LIBEXT) EXTRAFLAGS="$(EXTRAFLAGS)"
 
+ifeq ($(CONFIG_COSMAC_BANKING),y)
+
+# Code banking (ADR 0013 of the port).  A measuring link records the code
+# each object keeps after --gc-sections; tools/cosmac/cosmac_bank.py places
+# objects in banks by the board's rules ($(COSMAC_BANK_RULES)) and writes
+# renamed copies of the libraries, the far-call stubs and banks.ld, which
+# the board's linker script INCLUDEs; then the real link uses those
+# libraries first.  The placement report is nuttx.banks.
+
+BANKDIR = $(ARCH_SRCDIR)$(DELIM)bank
+BANKLIBS = $(addprefix $(TOPDIR)$(DELIM)staging$(DELIM),$(LINKLIBS))
+MEASURE_LDFLAGS = $(filter-out -T% -Map=%,$(LDFLAGS))
+
+nuttx$(EXEEXT): $(HEAD_OBJ) board/libboard$(LIBEXT) $(ARCHSCRIPT) $(COSMAC_BANK_RULES)
+	@echo "LD: nuttx (measuring link for bank placement)"
+	$(Q) mkdir -p $(BANKDIR)
+	$(Q) $(LD) --entry=__start $(MEASURE_LDFLAGS) --noinhibit-exec \
+		-T $(ARCH_SRCDIR)$(DELIM)common$(DELIM)cosmac_measure.ld \
+		-Map=$(BANKDIR)$(DELIM)measure.map $(LIBPATHS) $(EXTRA_LIBPATHS) \
+		-o $(BANKDIR)$(DELIM)measure.elf $(HEAD_OBJ) $(EXTRA_OBJS) \
+		$(LDSTARTGROUP) $(LDLIBS) $(EXTRA_LIBS) $(LDENDGROUP) \
+		> $(BANKDIR)$(DELIM)measure.log 2>&1 || true
+	$(Q) test -s $(BANKDIR)$(DELIM)measure.map
+	@echo "BANK: $(notdir $(COSMAC_BANK_RULES))"
+	$(Q) python3 $(TOPDIR)$(DELIM)tools$(DELIM)cosmac$(DELIM)cosmac_bank.py \
+		--rules $(COSMAC_BANK_RULES) --banks $(CONFIG_COSMAC_BANK_COUNT) \
+		--map $(BANKDIR)$(DELIM)measure.map \
+		--outdir $(BANKDIR)$(DELIM)libs --stubs $(BANKDIR)$(DELIM)stubs.S \
+		--ldscript $(BANKDIR)$(DELIM)libs$(DELIM)banks.ld \
+		--report $(TOPDIR)$(DELIM)nuttx.banks \
+		--objcopy $(OBJCOPY) --ar $(CROSSDEV)ar $(BANKLIBS)
+	$(Q) $(CC) -c -o $(BANKDIR)$(DELIM)stubs.o $(BANKDIR)$(DELIM)stubs.S
+	@echo "LD: nuttx"
+	$(Q) $(LD) --entry=__start -L $(BANKDIR)$(DELIM)libs $(LDFLAGS) \
+		$(LIBPATHS) $(EXTRA_LIBPATHS) \
+		-o $(NUTTX) $(HEAD_OBJ) $(BANKDIR)$(DELIM)stubs.o $(EXTRA_OBJS) \
+		$(LDSTARTGROUP) $(LDLIBS) $(EXTRA_LIBS) $(LDENDGROUP)
+else
 nuttx$(EXEEXT): $(HEAD_OBJ) board/libboard$(LIBEXT) $(ARCHSCRIPT)
 	@echo "LD: nuttx"
 	$(Q) $(LD) --entry=__start $(LDFLAGS) $(LIBPATHS) $(EXTRA_LIBPATHS) \
 		-o $(NUTTX) $(HEAD_OBJ) $(EXTRA_OBJS) \
 		$(LDSTARTGROUP) $(LDLIBS) $(EXTRA_LIBS) $(LDENDGROUP)
+endif
 ifneq ($(CONFIG_WINDOWS_NATIVE),y)
 	$(Q) $(NM) $(NUTTX) | \
 	grep -v '\(compiled\)\|\(\$(OBJEXT)$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | \
@@ -134,6 +173,7 @@ ifeq ($(BOARDMAKE),y)
 	$(Q) $(MAKE) -C board clean
 endif
 	$(call DELFILE, libarch$(LIBEXT))
+	$(call DELDIR, bank)
 	$(call CLEAN)
 
 distclean:: clean
