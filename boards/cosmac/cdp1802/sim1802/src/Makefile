@@ -22,6 +22,6 @@
 
 include $(TOPDIR)/Make.defs
 
-CSRCS = sim1802_boot.c
+CSRCS = sim1802_boot.c sim1802_lowputc.c
 
 include $(TOPDIR)/boards/Board.mk

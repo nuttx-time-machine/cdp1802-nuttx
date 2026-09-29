@@ -44,16 +44,6 @@
  * Public Functions
  ****************************************************************************/
 
-/* Board hooks and low-level console (the board provides them next) */
-
-void board_late_initialize(void)
-{
-}
-
-void up_putc(int ch)
-{
-}
-
 /* Timer (Step 07) */
 
 void up_timer_initialize(void)

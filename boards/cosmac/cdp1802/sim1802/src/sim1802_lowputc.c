@@ -1,5 +1,5 @@
 /****************************************************************************
- * boards/cosmac/cdp1802/sim1802/src/sim1802_boot.c
+ * boards/cosmac/cdp1802/sim1802/src/sim1802_lowputc.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -26,35 +26,53 @@
 
 #include <nuttx/config.h>
 
-#include <nuttx/board.h>
+#include <nuttx/arch.h>
+#include <nuttx/irq.h>
 
-#include <arch/board/board.h>
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+/* sim1802 I/O controller (docs/cdp1802/board-sim1802.md, section 4):
+ * OUT 6 writes the argument buffer, OUT 7 issues a command.
+ */
+
+#define SIM1802_CMD_CONSOLE_PUTCHAR 0xe0
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
 /****************************************************************************
- * Name: cdp1802_boardinitialize
+ * Name: up_putc
  *
  * Description:
- *   Board-specific initialization, called by the reset code before
- *   nx_start().  The sim1802 board needs none yet.
+ *   Low-level console output: one byte to the simulator console.  The
+ *   argument buffer is shared by all devices, so the two OUTs must not be
+ *   separated by an interrupt handler that uses the controller: interrupts
+ *   are disabled around them.  OUT uses X=2 (the ABI invariant) and the free
+ *   byte M(SP); it increments R2, which DEC 2 undoes.
  *
  ****************************************************************************/
 
-void cdp1802_boardinitialize(void)
+void up_putc(int ch)
 {
-}
+  irqstate_t flags = up_irq_save();
 
-/****************************************************************************
- * Name: board_late_initialize
- *
- * Description:
- *   Called by nx_bringup() once the OS is running.  Nothing to do yet.
- *
- ****************************************************************************/
+  __asm__ __volatile__
+    (
+      "glo %0\n\t"
+      "str 2\n\t"
+      "out 6\n\t"
+      "dec 2\n\t"
+      "ldi %1\n\t"
+      "str 2\n\t"
+      "out 7\n\t"
+      "dec 2"
+      :
+      : "r" (ch), "i" (SIM1802_CMD_CONSOLE_PUTCHAR)
+      : "memory"
+    );
 
-void board_late_initialize(void)
-{
+  up_irq_restore(flags);
 }
