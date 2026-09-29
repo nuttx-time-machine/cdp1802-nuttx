@@ -108,6 +108,7 @@ void cosmac_sigreturn(FAR const uint8_t *copy, FAR uint8_t *regs)
 struct tcb_s;
 void cosmac_bank_initstate(FAR struct tcb_s *tcb);
 void cosmac_bank_switch(FAR struct tcb_s *from, FAR struct tcb_s *to);
+void cosmac_bank_exitstate(void);
 void cosmac_bank_select(uint8_t bank);
 #endif
 

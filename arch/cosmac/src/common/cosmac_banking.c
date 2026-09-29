@@ -34,6 +34,16 @@
 #include "cosmac_internal.h"
 
 /****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+/* The bank return stack of a thread that is exiting (see
+ * cosmac_bank_exitstate()).
+ */
+
+static uint8_t g_cosmac_exit_brs[3 * CONFIG_COSMAC_BRS_DEPTH];
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -102,4 +112,25 @@ void cosmac_bank_switch(FAR struct tcb_s *from, FAR struct tcb_s *to)
     }
 
   cosmac_bank_select(g_cosmac_bankstate[3]);
+}
+
+/****************************************************************************
+ * Name: cosmac_bank_exitstate
+ *
+ * Description:
+ *   Called by up_exit() with interrupts disabled, before nxtask_exit()
+ *   releases the exiting thread's TCB, and with it the bank return stack
+ *   that the far calls it makes would use: switch to a static one, keeping
+ *   the selected bank.  The thread's own entries are discarded, since it
+ *   never returns.
+ *
+ ****************************************************************************/
+
+void cosmac_bank_exitstate(void)
+{
+  uintptr_t brs = (uintptr_t)g_cosmac_exit_brs;
+
+  g_cosmac_bankstate[0] = (uint8_t)(brs >> 8);
+  g_cosmac_bankstate[1] = (uint8_t)brs;
+  g_cosmac_bankstate[2] = CONFIG_COSMAC_BRS_DEPTH;
 }

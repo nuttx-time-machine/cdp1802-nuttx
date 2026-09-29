@@ -52,6 +52,14 @@ void up_exit(int status)
 {
   FAR struct tcb_s *tcb;
 
+#ifdef CONFIG_COSMAC_BANKING
+  /* nxtask_exit() releases this TCB, which holds the bank return stack
+   * that its far calls would use: continue on a static one.
+   */
+
+  cosmac_bank_exitstate();
+#endif
+
   /* Destroy the task at the head of the ready to run list; the next one
    * becomes the head.
    */
