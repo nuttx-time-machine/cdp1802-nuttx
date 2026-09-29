@@ -55,7 +55,10 @@ COBJS = $(CSRCS:.c=$(OBJEXT))
 SRCS = $(ASRCS) $(CSRCS)
 OBJS = $(AOBJS) $(COBJS)
 
-# Override in Make.defs if linker is not 'ld'
+# Override in Make.defs if linker is not 'ld'.  The compiler's runtime
+# library (EXTRA_LIBS) comes after the group: routines that the
+# architecture replaces (e.g. the 64-bit division in cosmac_div64.c) must
+# win however late in the group the first reference to them appears.
 
 LDSTARTGROUP ?= --start-group
 LDENDGROUP ?= --end-group
@@ -111,7 +114,7 @@ nuttx$(EXEEXT): $(HEAD_OBJ) board/libboard$(LIBEXT) $(ARCHSCRIPT) $(COSMAC_BANK_
 		-T $(ARCH_SRCDIR)$(DELIM)common$(DELIM)cosmac_measure.ld \
 		-Map=$(BANKDIR)$(DELIM)measure.map $(LIBPATHS) $(EXTRA_LIBPATHS) \
 		-o $(BANKDIR)$(DELIM)measure.elf $(HEAD_OBJ) $(EXTRA_OBJS) \
-		$(LDSTARTGROUP) $(LDLIBS) $(EXTRA_LIBS) $(LDENDGROUP) \
+		$(LDSTARTGROUP) $(LDLIBS) $(LDENDGROUP) $(EXTRA_LIBS) \
 		> $(BANKDIR)$(DELIM)measure.log 2>&1 || true
 	$(Q) test -s $(BANKDIR)$(DELIM)measure.map
 	@echo "BANK: $(notdir $(COSMAC_BANK_RULES))"
@@ -127,13 +130,13 @@ nuttx$(EXEEXT): $(HEAD_OBJ) board/libboard$(LIBEXT) $(ARCHSCRIPT) $(COSMAC_BANK_
 	$(Q) $(LD) --entry=__start -L $(BANKDIR)$(DELIM)libs $(LDFLAGS) \
 		$(LIBPATHS) $(EXTRA_LIBPATHS) \
 		-o $(NUTTX) $(HEAD_OBJ) $(BANKDIR)$(DELIM)stubs.o $(EXTRA_OBJS) \
-		$(LDSTARTGROUP) $(LDLIBS) $(EXTRA_LIBS) $(LDENDGROUP)
+		$(LDSTARTGROUP) $(LDLIBS) $(LDENDGROUP) $(EXTRA_LIBS)
 else
 nuttx$(EXEEXT): $(HEAD_OBJ) board/libboard$(LIBEXT) $(ARCHSCRIPT)
 	@echo "LD: nuttx"
 	$(Q) $(LD) --entry=__start $(LDFLAGS) $(LIBPATHS) $(EXTRA_LIBPATHS) \
 		-o $(NUTTX) $(HEAD_OBJ) $(EXTRA_OBJS) \
-		$(LDSTARTGROUP) $(LDLIBS) $(EXTRA_LIBS) $(LDENDGROUP)
+		$(LDSTARTGROUP) $(LDLIBS) $(LDENDGROUP) $(EXTRA_LIBS)
 endif
 ifneq ($(CONFIG_WINDOWS_NATIVE),y)
 	$(Q) $(NM) $(NUTTX) | \
