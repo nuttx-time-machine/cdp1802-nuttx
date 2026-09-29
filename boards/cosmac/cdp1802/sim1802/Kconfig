@@ -48,4 +48,14 @@ config BOARD_SIM1802_CLOCK_HZ
 		machine cycles (8 clock periods each) for the cycle-driven
 		timer and into time for measurements.
 
+config BOARD_SIM1802_TICKTEST
+	bool "Timer tick and watchdog test (replaces the idle loop)"
+	default n
+	select ARCH_IDLE_CUSTOM
+	---help---
+		Test code for the port's Step 07: the idle loop starts a watchdog
+		that re-arms itself every 50 ticks, prints the tick and machine
+		cycle counts between callbacks and the cost of a timer interrupt,
+		then halts the simulator.  Not for normal use.
+
 endif # ARCH_BOARD_SIM1802

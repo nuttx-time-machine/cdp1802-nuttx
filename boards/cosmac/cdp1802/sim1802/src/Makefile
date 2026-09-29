@@ -24,4 +24,8 @@ include $(TOPDIR)/Make.defs
 
 CSRCS = sim1802_boot.c sim1802_irq.c sim1802_lowputc.c sim1802_timer.c
 
+ifeq ($(CONFIG_BOARD_SIM1802_TICKTEST),y)
+CSRCS += sim1802_ticktest.c
+endif
+
 include $(TOPDIR)/boards/Board.mk
