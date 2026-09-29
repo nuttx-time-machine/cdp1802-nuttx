@@ -1,0 +1,47 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+if ARCH_COSMAC
+comment "COSMAC Options"
+
+choice
+	prompt "COSMAC chip selection"
+	default ARCH_CHIP_CDP1802
+
+config ARCH_CHIP_CDP1802
+	bool "RCA CDP1802"
+	select MM_SMALL
+	select LIBC_ATOMIC_IRQ
+	---help---
+		RCA CDP1802 COSMAC 8-bit microprocessor (compiled with
+		cdp1802-elf-gcc -march=1802).
+
+endchoice # COSMAC chip selection
+
+config ARCH_CHIP
+	string
+	default "cdp1802" if ARCH_CHIP_CDP1802
+
+choice
+	prompt "Interrupt enable state"
+	default COSMAC_IRQSTATE_LSIE
+
+config COSMAC_IRQSTATE_LSIE
+	bool "Read IE with LSIE"
+	---help---
+		up_irq_save() reads the hardware IE flip-flop with the LSIE
+		instruction (long skip if IE=1) and changes it with DIS/RET, like
+		the other NuttX ports that read their hardware interrupt state.
+
+config COSMAC_IRQSTATE_SWFLAG
+	bool "Software interrupt-enable flag"
+	---help---
+		Keep a copy of IE in RAM instead of reading it with LSIE.  Every
+		interrupt entry/exit and context switch keeps the copy in step with
+		the hardware.  Implemented in Step 07.
+
+endchoice # Interrupt enable state
+
+endif # ARCH_COSMAC

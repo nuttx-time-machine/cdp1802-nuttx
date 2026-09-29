@@ -52,6 +52,13 @@ config ARCH_AVR
 	---help---
 		Atmel 8-bit bit AVR and 32-bit AVR32 architectures
 
+config ARCH_COSMAC
+	bool "COSMAC"
+	select ARCH_TOOLCHAIN_GCC
+	select ARCH_HAVE_CUSTOMOPT
+	---help---
+		RCA COSMAC 8-bit architectures (CDP1802).
+
 config ARCH_HC
 	bool "Freescale HC"
 	select ARCH_NOINTC
@@ -218,6 +225,7 @@ config ARCH
 	default "arm"     if ARCH_ARM
 	default "arm64"   if ARCH_ARM64
 	default "avr"     if ARCH_AVR
+	default "cosmac"  if ARCH_COSMAC
 	default "hc"      if ARCH_HC
 	default "mips"    if ARCH_MIPS
 	default "misoc"   if ARCH_MISOC
@@ -241,6 +249,9 @@ source "arch/arm64/Kconfig"
 endif
 if ARCH_AVR
 source "arch/avr/Kconfig"
+endif
+if ARCH_COSMAC
+source "arch/cosmac/Kconfig"
 endif
 if ARCH_HC
 source "arch/hc/Kconfig"
