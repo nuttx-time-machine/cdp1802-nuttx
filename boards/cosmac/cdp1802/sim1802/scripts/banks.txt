@@ -14,6 +14,18 @@
 
 fixed   libarch.a:*
 fixed   libmm.a:*
+
+# The timer tick runs 50 times a second: every far call on its path costs
+# about 400 cycles (measured at Step 07: a tick with this path banked took
+# 5 795 cycles, more than the 5 000-cycle tick period at 100 Hz).
+
+fixed   libsched.a:irq_dispatch.o
+fixed   libsched.a:sched_processtick.o
+fixed   libsched.a:wd_start.o
+fixed   libsched.a:clock_sched_ticks.o
+fixed   libsched.a:clock_systime_ticks.o
+fixed   libsched.a:sched_switchcontext.o
+
 auto    libsched.a:*
 auto    libc.a:*
 auto    libfs.a:*
