@@ -26,6 +26,8 @@ include $(TOPDIR)/arch/cosmac/src/cdp1802/Toolchain.defs
 
 ifeq ($(CONFIG_BOARD_SIM1802_PROFILE_SIM64),y)
   LDSCRIPT = sim64.ld
+else ifeq ($(CONFIG_BOARD_SIM1802_PROFILE_HW48),y)
+  LDSCRIPT = hw48.ld
 else
   LDSCRIPT = hw32.ld
 endif

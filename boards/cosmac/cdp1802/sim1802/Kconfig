@@ -15,6 +15,13 @@ config BOARD_SIM1802_PROFILE_HW32
 		The layout of a typical real COSMAC board.  The ROM image
 		(nuttx.bin) must fit in 32 KiB.  Used for feasibility judgements.
 
+config BOARD_SIM1802_PROFILE_HW48
+	bool "HW48/16: 48 KiB ROM at 0x0000, 16 KiB RAM at 0xC000"
+	---help---
+		More ROM for less RAM: the ROM image (nuttx.bin) may be up to
+		48 KiB.  The same address split is used by the banked profile
+		(ROM window 0x8000-0xBFFF).
+
 config BOARD_SIM1802_PROFILE_SIM64
 	bool "SIM64: ROM image from 0x0000, RAM for the rest of 64 KiB"
 	---help---
