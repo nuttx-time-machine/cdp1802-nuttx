@@ -22,6 +22,16 @@ config BOARD_SIM1802_PROFILE_HW48
 		48 KiB.  The same address split is used by the banked profile
 		(ROM window 0x8000-0xBFFF).
 
+config BOARD_SIM1802_PROFILE_HWB
+	bool "HWB: 32 KiB fixed ROM, 16 KiB bank window at 0x8000, 16 KiB RAM"
+	select COSMAC_BANKING
+	---help---
+		Code banking (ADR 0013): the ROM image is a 32 KiB fixed part
+		followed by CONFIG_COSMAC_BANK_COUNT banks of 16 KiB; the bank
+		shown at 0x8000-0xBFFF is selected by a latch on output port
+		CONFIG_COSMAC_BANK_PORT.  Objects are placed in banks by the rules
+		in scripts/banks.txt.
+
 config BOARD_SIM1802_PROFILE_SIM64
 	bool "SIM64: ROM image from 0x0000, RAM for the rest of 64 KiB"
 	---help---

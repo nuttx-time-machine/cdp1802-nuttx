@@ -1,0 +1,21 @@
+# boards/cosmac/cdp1802/sim1802/scripts/banks.txt
+#
+# Code placement for the HWB profile (tools/cosmac/cosmac_bank.py,
+# ADR 0013).  One rule per line, first match wins:
+#
+#   <bank>|auto|fixed   <archive-glob>:<member-glob>
+#
+# Objects that match no rule stay in the 32 KiB fixed ROM, as do libgcc and
+# the board library (not given to the tool).  The architecture library holds
+# the reset code, the NCRT and far-call routines and the interrupt and
+# context-switch code: it must stay fixed.  Every far call costs about 400
+# machine cycles more than a near call, so frequently called code (the
+# memory manager) stays fixed as well.
+
+fixed   libarch.a:*
+fixed   libmm.a:*
+auto    libsched.a:*
+auto    libc.a:*
+auto    libfs.a:*
+auto    libdrivers.a:*
+auto    libapps.a:*
