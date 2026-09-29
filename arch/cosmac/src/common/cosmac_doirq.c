@@ -73,6 +73,9 @@ FAR uint8_t *cosmac_doirq(FAR uint8_t *regs)
   if (tcb != *running_task)
     {
       nxsched_switch_context(*running_task, tcb);
+#ifdef CONFIG_COSMAC_BANKING
+      cosmac_bank_switch(*running_task, tcb);
+#endif
       *running_task = tcb;
     }
 

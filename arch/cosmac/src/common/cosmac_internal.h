@@ -66,6 +66,13 @@ extern uint8_t g_cosmac_idle_brs[];
 
 #ifdef CONFIG_COSMAC_BANKING
 void cosmac_brs_overflow(void) noreturn_function;
+
+/* Per-thread banking state (cosmac_banking.c, cosmac_farcall.S) */
+
+struct tcb_s;
+void cosmac_bank_initstate(FAR struct tcb_s *tcb);
+void cosmac_bank_switch(FAR struct tcb_s *from, FAR struct tcb_s *to);
+void cosmac_bank_select(uint8_t bank);
 #endif
 
 /* Interrupts (cosmac_irqentry.S, cosmac_doirq.c) */

@@ -89,6 +89,16 @@ struct xcptcontext
    */
 
   FAR uint8_t *regs;
+
+#ifdef CONFIG_COSMAC_BANKING
+  /* Code banking (cosmac_farcall.S): the thread's copy of the first four
+   * bytes of g_cosmac_bankstate (BRS pointer, free entries, bank) while it
+   * is not running, and its bank return stack.
+   */
+
+  uint8_t bankstate[4];
+  uint8_t brs[3 * CONFIG_COSMAC_BRS_DEPTH];
+#endif
 };
 
 #endif /* __ASSEMBLY__ */

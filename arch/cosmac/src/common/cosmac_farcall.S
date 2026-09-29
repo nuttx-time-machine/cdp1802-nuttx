@@ -86,6 +86,7 @@
 	.global	__cosmac_farcall
 	.global	__cosmac_farret
 	.global	cosmac_bank_initialize
+	.global	cosmac_bank_select
 	.global	g_cosmac_bankstate
 	.global	g_cosmac_idle_brs
 	.global	cosmac_brs_overflow
@@ -369,6 +370,24 @@ cosmac_bank_initialize:
 	sex	2
 	sep	5
 	.size	cosmac_bank_initialize, .-cosmac_bank_initialize
+
+/****************************************************************************
+ * Name: cosmac_bank_select
+ *
+ * Description:
+ *   void cosmac_bank_select(uint8_t bank): write the latch (the caller
+ *   keeps the shadow in g_cosmac_bankstate).  Context switch only.
+ *
+ ****************************************************************************/
+
+	.type	cosmac_bank_select, @function
+cosmac_bank_select:
+	glo	7
+	str	2			/* the free byte M(SP) */
+	out	CONFIG_COSMAC_BANK_PORT	/* R2++ */
+	dec	2
+	sep	5
+	.size	cosmac_bank_select, .-cosmac_bank_select
 
 /****************************************************************************
  * Data
