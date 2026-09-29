@@ -8,10 +8,12 @@
 # Objects that match no rule stay in the 32 KiB fixed ROM, as do libgcc and
 # the board library (not given to the tool).  The architecture library holds
 # the reset code, the NCRT and far-call routines and the interrupt and
-# context-switch code: it must stay fixed.  Every far call costs about 400
+# context-switch code: it must stay fixed, except the 64-bit division
+# helpers (plain C functions, not used by the tick or the switch path).  Every far call costs about 400
 # machine cycles more than a near call, so frequently called code (the
 # memory manager) stays fixed as well.
 
+auto    libarch.a:cosmac_div64.o
 fixed   libarch.a:*
 fixed   libmm.a:*
 
@@ -25,6 +27,7 @@ fixed   libsched.a:wd_start.o
 fixed   libsched.a:clock_sched_ticks.o
 fixed   libsched.a:clock_systime_ticks.o
 fixed   libsched.a:sched_switchcontext.o
+fixed   libsched.a:sched_roundrobin.o
 
 auto    libsched.a:*
 auto    libc.a:*
