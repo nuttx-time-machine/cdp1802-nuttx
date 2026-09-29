@@ -127,4 +127,12 @@ void cosmac_irq_initialize(void);
 int cosmac_irq_acknowledge(void);
 void cosmac_irq_rearm(int irq);
 
+/* Provided by the board when it has serial devices (CONFIG_MCU_SERIAL):
+ * register them.  Called by up_initialize().
+ */
+
+#ifdef CONFIG_MCU_SERIAL
+void cosmac_serialinit(void);
+#endif
+
 #endif /* __ARCH_COSMAC_SRC_COMMON_COSMAC_INTERNAL_H */

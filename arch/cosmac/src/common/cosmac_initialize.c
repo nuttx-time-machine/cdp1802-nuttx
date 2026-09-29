@@ -29,6 +29,8 @@
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
 
+#include "cosmac_internal.h"
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -37,12 +39,15 @@
  * Name: up_initialize
  *
  * Description:
- *   Called once by nx_start() after the basic OS services are up.  Nothing
- *   to do yet: the console needs no initialization (Step 06), the serial
- *   driver is registered in Step 09.
+ *   Called once by nx_start() after the basic OS services are up: register
+ *   the board's serial devices, if any (the console is also available
+ *   earlier through up_putc(), which needs no initialization).
  *
  ****************************************************************************/
 
 void up_initialize(void)
 {
+#ifdef CONFIG_MCU_SERIAL
+  cosmac_serialinit();
+#endif
 }
