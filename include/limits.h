@@ -240,7 +240,11 @@
 #define TIMER_MAX      _POSIX_TIMER_MAX
 #define CLOCKRES_MIN   _POSIX_CLOCKRES_MIN
 
-#define CLOCK_MAX      INT64_MAX
+#ifdef CONFIG_SYSTEM_TIME32
+#  define CLOCK_MAX    INT32_MAX
+#else
+#  define CLOCK_MAX    INT64_MAX
+#endif
 
 /* Other invariant values */
 

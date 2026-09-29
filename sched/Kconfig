@@ -167,6 +167,18 @@ config SYSTEMTICK_HOOK
 
 endif # !SCHED_TICKLESS
 
+config SYSTEM_TIME32
+	bool "32-bit system time"
+	default n
+	---help---
+		Use 32-bit signed time_t and clock_t instead of the default
+		64-bit types.  On CPUs without 32/64-bit arithmetic every 64-bit
+		operation is a library call, and the time-keeping code grows
+		accordingly (about 13 KB on the RCA CDP1802).  The price is range:
+		the system tick count overflows after 2^31 ticks (about 248 days
+		at 100 Hz) and time_t overflows in 2038.  Only for small targets
+		that accept these limits.
+
 config ARCH_HAVE_ADJTIME
 	bool
 	default n
