@@ -30,9 +30,12 @@
  * and take about 3.5 KB together.  Because the architecture library is
  * linked before libgcc, these definitions are the ones used.
  *
- * When both operands fit in 32 bits (the common case: tick and nanosecond
- * conversions), the 32-bit division from libgcc's hand-written assembly is
- * used instead of the 64-iteration loop.
+ * When both operands fit in 16 or 32 bits (the common cases: printing
+ * numbers with printf, whose __ultoa_invert() divides in 64 bits, and tick
+ * and nanosecond conversions), the 16- or 32-bit division of libgcc's
+ * hand-written assembly is used instead of the 64-iteration loop.  The
+ * operands' high parts are tested through a union, not with 64-bit shifts,
+ * which are library calls on this CPU.
  */
 
 /****************************************************************************
@@ -43,6 +46,29 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
+/****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+/* A 64-bit value in the CDP1802's big-endian byte order */
+
+union cosmac_u64_u
+{
+  uint64_t v;
+  struct
+    {
+      uint16_t w3;              /* Most significant */
+      uint16_t w2;
+      uint16_t w1;
+      uint16_t w0;              /* Least significant */
+    } w;
+  struct
+    {
+      uint32_t hi;
+      uint32_t lo;
+    } l;
+};
 
 /****************************************************************************
  * Public Function Prototypes
@@ -70,23 +96,45 @@ int64_t __moddi3(int64_t a, int64_t b);
 static uint64_t noinline_function udivmod64(uint64_t n, uint64_t d,
                                             FAR uint64_t *rem)
 {
+  union cosmac_u64_u un;
+  union cosmac_u64_u ud;
   uint64_t q = 0;
   uint64_t r = 0;
   int i;
 
-  if ((uint32_t)(n >> 32) == 0 && (uint32_t)(d >> 32) == 0 && d != 0)
+  un.v = n;
+  ud.v = d;
+  if ((un.w.w3 | un.w.w2 | ud.w.w3 | ud.w.w2) == 0)
     {
-      /* Both operands fit in 32 bits */
-
-      uint32_t n32 = (uint32_t)n;
-      uint32_t d32 = (uint32_t)d;
-
-      if (rem != NULL)
+      if ((un.w.w1 | ud.w.w1) == 0 && ud.w.w0 != 0)
         {
-          *rem = n32 % d32;
+          /* Both operands fit in 16 bits */
+
+          uint16_t n16 = un.w.w0;
+          uint16_t d16 = ud.w.w0;
+
+          if (rem != NULL)
+            {
+              *rem = n16 % d16;
+            }
+
+          return n16 / d16;
         }
 
-      return n32 / d32;
+      if (ud.l.lo != 0)
+        {
+          /* Both operands fit in 32 bits */
+
+          uint32_t n32 = un.l.lo;
+          uint32_t d32 = ud.l.lo;
+
+          if (rem != NULL)
+            {
+              *rem = n32 % d32;
+            }
+
+          return n32 / d32;
+        }
     }
 
   for (i = 63; i >= 0; i--)
