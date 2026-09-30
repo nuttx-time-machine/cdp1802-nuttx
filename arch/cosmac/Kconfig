@@ -75,11 +75,13 @@ config COSMAC_BANK_COUNT
 
 config COSMAC_BRS_DEPTH
 	int "Bank return stack depth"
-	default 16
+	default 24
 	range 1 255
 	---help---
 		Maximum nesting of far calls per thread (3 bytes of RAM each per
-		thread).  Overflow causes a PANIC.
+		thread).  Overflow causes a PANIC.  NSH's ps nests 18 far calls
+		on sim1802; the depth needed also depends on code placement, so
+		keep a margin.
 
 endif # COSMAC_BANKING
 
