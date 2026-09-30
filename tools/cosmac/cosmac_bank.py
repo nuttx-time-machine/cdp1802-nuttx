@@ -52,8 +52,12 @@ elsewhere.  A reference is a *call* when it is the 16-bit operand of
 reference to a function is an address.
 
 Placement rules (first match wins; unmatched objects stay fixed):
-    <bank>|auto|fixed   <archive-glob>:<member-glob>
-Plain objects match as "-:<file name>".  "auto" packs objects, largest
+    <bank>|auto|fixed|hot   <archive-glob>:<member-glob>
+Plain objects match as "-:<file name>".  "hot" objects (small functions
+called from everywhere) stay in fixed ROM while it has room, in rule order,
+and are otherwise placed like "auto": the room is the fixed ROM (--window)
+minus everything that is not banked in the flat link's map (--map), the
+stubs and a margin (--fixed-reserve).  "auto" packs objects, largest
 first, into the first bank with room; an object that does not fit any bank
 as a whole is split, function (code section) by function.  Object sizes come from the map of a
 flat link (--map) when given: only code that survives --gc-sections counts,
@@ -362,10 +366,10 @@ def parse_rules(path):
         fields = line.split()
         if len(fields) != 2 or ":" not in fields[1]:
             raise SystemExit(
-                "%s:%d: expected '<bank>|auto|fixed <archive>:<member>'" % (path, n)
+                "%s:%d: expected '<bank>|auto|fixed|hot <archive>:<member>'" % (path, n)
             )
         where, pattern = fields
-        if where not in ("auto", "fixed"):
+        if where not in ("auto", "fixed", "hot"):
             where = int(where)
         arch, member = pattern.split(":", 1)
         rules.append((where, arch, member))
@@ -373,12 +377,17 @@ def parse_rules(path):
 
 
 def match_rule(rules, unit):
-    for where, arch, member in rules:
+    return match_rule_index(rules, unit)[0]
+
+
+def match_rule_index(rules, unit):
+    """(placement, index of the matching rule) of a unit."""
+    for n, (where, arch, member) in enumerate(rules):
         if fnmatch.fnmatchcase(unit.archive, arch) and fnmatch.fnmatchcase(
             unit.member, member
         ):
-            return where
-    return "fixed"
+            return where, n
+    return "fixed", len(rules)
 
 
 MAP_SECTION = re.compile(r"^ (\.text\S*)\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)\s+(\S.*)$")
@@ -415,6 +424,20 @@ def map_sizes(path):
         secs = sizes.setdefault(key, {})
         secs[name] = secs.get(name, 0) + size
     return sizes
+
+
+MAP_OUTPUT = re.compile(r"^(\.\S+)\s+0x[0-9a-f]+\s+0x([0-9a-f]+)")
+
+
+def map_rom_total(path):
+    """Bytes of ROM (code, read-only data, initialized data) in a map of the
+    measuring link (cosmac_measure.ld)."""
+    total = 0
+    for line in open(path):
+        m = MAP_OUTPUT.match(line)
+        if m and m.group(1) in (".text", ".init_section", ".data"):
+            total += int(m.group(2), 16)
+    return total
 
 
 # Placement ##################################################################
@@ -485,6 +508,7 @@ def assign_banks(units, rules, sizes, args, log):
             definitions.setdefault(name, []).append(u)
     used = [0] * args.banks
     autos = []
+    hots = []
     for u in units:
         where = match_rule(rules, u)
         if where == "fixed" or u.size == 0:
@@ -492,12 +516,38 @@ def assign_banks(units, rules, sizes, args, log):
         u.why_fixed = why_fixed(u, definitions)
         if u.why_fixed:
             log.append("fixed: %s (%s)" % (u.key, u.why_fixed))
+        elif where == "hot":
+            hots.append(u)
         elif where == "auto":
             autos.append(u)
         elif not 0 <= where < args.banks:
             raise SystemExit("%s: bank %d out of range" % (u.key, where))
         else:
             place(u, where, used)
+    if hots:
+        if args.map is None:
+            raise SystemExit("'hot' rules need --map")
+        # Fixed ROM if every hot object stayed there: everything except the
+        # code that will be banked, plus at most one stub per global
+        # function of a banked object.
+        banked = [u for u in autos] + [u for u in units if u.secbank]
+        stub_bytes = 6 * sum(len(u.defined) for u in banked)
+        room = (
+            args.window
+            - map_rom_total(args.map)
+            + sum(u.size for u in banked)
+            - stub_bytes
+            - args.fixed_reserve
+        )
+        for u in sorted(hots, key=lambda u: match_rule_index(rules, u)[1]):
+            if u.size <= room:
+                room -= u.size
+                log.append("hot, fixed: %s (%d bytes)" % (u.key, u.size))
+            else:
+                autos.append(u)
+                log.append(
+                    "hot, banked: %s (%d bytes, fixed ROM full)" % (u.key, u.size)
+                )
     capacity = args.bank_size - args.reserve
     split = []
     for u in sorted(autos, key=lambda u: -u.size):
@@ -697,6 +747,12 @@ def parse_args():
         help="bytes kept free in each bank for auto placement",
     )
     ap.add_argument("--map", help="map of a flat link, for object sizes")
+    ap.add_argument(
+        "--fixed-reserve",
+        type=int,
+        default=1024,
+        help="bytes of fixed ROM kept free when placing 'hot' objects",
+    )
     ap.add_argument("--outdir", required=True)
     ap.add_argument("--stubs", required=True)
     ap.add_argument("--report")
