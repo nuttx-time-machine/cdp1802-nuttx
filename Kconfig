@@ -138,6 +138,25 @@ config DEFAULT_SMALL
 		have already been selected in your configuration file.  This applies
 		only to new settings that require a default value.
 
+config NO_POSIX_COMPLIANT
+	bool "Give up POSIX compliance to avoid 64-bit arithmetic"
+	default n
+	select SYSTEM_TIME32
+	---help---
+		For small CPUs (8-bit, 16-bit int) where every 64-bit operation is
+		a large library call: remove what makes the OS do 64-bit
+		arithmetic, at the price of POSIX and C conformance:
+
+		- time_t and clock_t are 32 bits (SYSTEM_TIME32: time_t overflows
+		  in 2038, the tick count after 2^31 ticks);
+		- no large files (FS_LARGEFILE): off_t is 32 bits;
+		- printf has no long long support (LIBC_LONG_LONG):
+		  the "ll" and "j" length modifiers still consume a 64-bit
+		  argument, but only its low 32 bits are printed.
+
+		long long remains a C type: code that uses it explicitly still
+		gets 64-bit arithmetic.
+
 choice
 	prompt "Build Host Platform"
 	default HOST_LINUX

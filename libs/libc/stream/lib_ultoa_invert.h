@@ -52,11 +52,28 @@
 #define XTOA_UPPER   0x0200    /* Use upper case letters */
 
 /****************************************************************************
+ * Public Types
+ ****************************************************************************/
+
+/* The integer types in which printf converts numbers.  Without
+ * CONFIG_LIBC_LONG_LONG a long long argument is still read whole, but
+ * converted in unsigned long (only its low bits are printed).
+ */
+
+#ifdef CONFIG_LIBC_LONG_LONG
+typedef long long ultoa_int_t;
+typedef unsigned long long ultoa_uint_t;
+#else
+typedef long ultoa_int_t;
+typedef unsigned long ultoa_uint_t;
+#endif
+
+/****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
 
 /* Internal function for use from `printf'. */
 
-FAR char *__ultoa_invert(unsigned long long val, FAR char *str, int base);
+FAR char *__ultoa_invert(ultoa_uint_t val, FAR char *str, int base);
 
 #endif /* __LIBS_LIBC_STREAM_LIB_ULTOA_INVERT_H */

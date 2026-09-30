@@ -929,14 +929,14 @@ str_lpad:
 
       if (c == 'd' || c == 'i')
         {
-          long long x;
+          ultoa_int_t x;
 
           if ((flags & FL_LONG) != 0 && (flags & FL_REPD_TYPE) != 0)
             {
 #ifdef CONFIG_LIBC_NUMBERED_ARGS
               if ((flags & FL_ARGNUMBER) != 0)
                 {
-                  x = (long long)arglist->value[argnumber - 1].ull;
+                  x = (ultoa_int_t)arglist->value[argnumber - 1].ull;
                 }
               else
                 {
@@ -992,7 +992,7 @@ str_lpad:
           flags &= ~(FL_NEGATIVE | FL_ALT);
           if (x < 0)
             {
-              x = -(unsigned long long)x;
+              x = -(ultoa_uint_t)x;
               flags |= FL_NEGATIVE;
             }
 
@@ -1008,7 +1008,7 @@ str_lpad:
       else
         {
           int base;
-          unsigned long long x;
+          ultoa_uint_t x;
 
           if ((flags & FL_LONG) != 0 && (flags & FL_REPD_TYPE) != 0)
             {

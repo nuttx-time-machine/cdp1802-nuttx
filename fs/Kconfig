@@ -20,6 +20,7 @@ config DISABLE_MOUNTPOINT
 config FS_LARGEFILE
 	bool "Large File Support"
 	default n
+	depends on !NO_POSIX_COMPLIANT
 	---help---
 		Support files which's length is larger than 4GB:
 		https://www.opengroup.org/platform/lfs.html

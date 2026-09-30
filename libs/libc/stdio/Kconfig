@@ -60,6 +60,18 @@ config LIBC_FLOATINGPOINT
 		By default, floating point support in printf, sscanf, etc. is
 		disabled.  This option will enable floating point support.
 
+config LIBC_LONG_LONG
+	bool "Enable long long support in printf"
+	default y
+	depends on !NO_POSIX_COMPLIANT
+	---help---
+		Print 64-bit values with the "ll" and "j" length modifiers (and
+		"z", "t" and "p" where those types are 64 bits wide).  Without it,
+		printf does all its integer arithmetic in unsigned long: such
+		arguments are still consumed whole, but only their low 32 bits
+		are printed.  This saves the 64-bit division and shift routines,
+		which are large on CPUs without 32-bit arithmetic.
+
 config LIBC_NUMBERED_ARGS
 	bool "Enable numbered arguments in printf"
 	default n
