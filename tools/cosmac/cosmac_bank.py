@@ -548,6 +548,12 @@ def assign_banks(units, rules, sizes, args, log):
                 log.append(
                     "hot, banked: %s (%d bytes, fixed ROM full)" % (u.key, u.size)
                 )
+    for b, n in enumerate(used):
+        if n > args.bank_size:
+            raise SystemExit(
+                "bank %d: the objects placed there by rules need %d bytes, "
+                "more than the bank's %d" % (b, n, args.bank_size)
+            )
     capacity = args.bank_size - args.reserve
     split = []
     for u in sorted(autos, key=lambda u: -u.size):
