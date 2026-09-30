@@ -66,7 +66,10 @@ config BOARD_SIM1802_CLOCK_HZ
 	---help---
 		The simulator has no clock; this value converts time into
 		machine cycles (8 clock periods each) for the cycle-driven
-		timer and into time for measurements.
+		timer and into time for measurements.  4 MHz is realistic (the
+		CDP1805AC's maximum is 5 MHz).  sim1802:ostest uses a virtual
+		64 MHz so that ostest's time-based synchronisation has room: see
+		the port's ADR 0020.
 
 config BOARD_SIM1802_TICKTEST
 	bool "Timer tick and watchdog test (replaces the idle loop)"
