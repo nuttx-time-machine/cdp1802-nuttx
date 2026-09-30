@@ -85,4 +85,32 @@ config COSMAC_BRS_DEPTH
 
 endif # COSMAC_BANKING
 
+menu "Code generation (speed versus size)"
+
+config COSMAC_INLINE_CALLS
+	bool "Inline call sequences (-minline-calls)"
+	default n
+	---help---
+		Call functions by pushing the return address and branching
+		instead of through the NCRT call routine: 11 instead of about
+		37 machine cycles per call, 6 bytes more per call site.  Needs a
+		GCC with the port's patch 0002 (ADR 0023).
+
+config COSMAC_INLINE_COMPARE
+	bool "Inline 16-bit comparisons (-minline-compare)"
+	default n
+	---help---
+		Expand 16-bit comparisons inline instead of calling the __cmphi_*
+		routines of libgcc.  Faster, larger.  Needs GCC patch 0002.
+
+config COSMAC_INLINE_SHIFTS
+	bool "Inline 16-bit constant shifts (-minline-shifts)"
+	default n
+	---help---
+		Expand 16-bit shifts by a constant inline instead of calling
+		__ashlhi3/__lshrhi3/__ashrhi3.  Faster, larger for most counts.
+		Needs GCC patch 0002.
+
+endmenu # Code generation
+
 endif # ARCH_COSMAC

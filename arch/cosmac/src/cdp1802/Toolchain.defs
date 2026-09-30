@@ -64,6 +64,18 @@ ARCHOPTIMIZATION += -fomit-frame-pointer
 COSMAC_GCC_WORKAROUNDS ?= -fno-split-wide-types
 ARCHCFLAGS += $(COSMAC_GCC_WORKAROUNDS)
 
+# Speed options of the port's GCC patch 0002 (ADR 0023)
+
+ifeq ($(CONFIG_COSMAC_INLINE_CALLS),y)
+  ARCHCFLAGS += -minline-calls
+endif
+ifeq ($(CONFIG_COSMAC_INLINE_COMPARE),y)
+  ARCHCFLAGS += -minline-compare
+endif
+ifeq ($(CONFIG_COSMAC_INLINE_SHIFTS),y)
+  ARCHCFLAGS += -minline-shifts
+endif
+
 ARCHCFLAGS += -fno-common
 ARCHCFLAGS += -Wall -Wstrict-prototypes -Wshadow -Wundef -Wno-attributes -Wno-unknown-pragmas
 
