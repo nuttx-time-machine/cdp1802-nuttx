@@ -52,13 +52,19 @@
  *   would overwrite the interrupt handler's own stack: there is no
  *   separate interrupt stack.)
  *
+ *   The copy includes the byte above the frame, M(SP): cosmac_sigdeliver()
+ *   starts with SP there and overwrites it, but a thread interrupted
+ *   between "lda 2" and "ldn 2" in cosmac_ncrt_ret still has to read the
+ *   low byte of its return address from it.  The interrupt entry keeps
+ *   that byte for the same reason.
+ *
  ****************************************************************************/
 
 void up_schedule_sigaction(FAR struct tcb_s *tcb)
 {
   FAR uint8_t *regs = tcb->xcp.regs;
 
-  memcpy(tcb->xcp.sigregs, regs, XCPTCONTEXT_SIZE);
+  memcpy(tcb->xcp.sigregs, regs, XCPTCONTEXT_SIGSIZE);
   tcb->xcp.saved_regs = regs;
 
   regs[REG_XP] = 0x23;

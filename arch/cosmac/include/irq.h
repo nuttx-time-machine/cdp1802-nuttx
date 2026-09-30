@@ -69,6 +69,13 @@
 #define XCPTCONTEXT_REGS      31
 #define XCPTCONTEXT_SIZE      XCPTCONTEXT_REGS
 
+/* Signal delivery saves the frame and the byte just above it, M(SP): the
+ * thread's free byte, which is live when it was interrupted inside
+ * cosmac_ncrt_ret (see up_schedule_sigaction()).
+ */
+
+#define XCPTCONTEXT_SIGSIZE   (XCPTCONTEXT_SIZE + 1)
+
 #define REG_PCH               REG_R(3)
 #define REG_PCL               (REG_R(3) + 1)
 
@@ -97,7 +104,7 @@ struct xcptcontext
    */
 
   FAR uint8_t *saved_regs;
-  uint8_t sigregs[XCPTCONTEXT_REGS];
+  uint8_t sigregs[XCPTCONTEXT_SIGSIZE];
 #endif
 
 #ifdef CONFIG_COSMAC_BANKING

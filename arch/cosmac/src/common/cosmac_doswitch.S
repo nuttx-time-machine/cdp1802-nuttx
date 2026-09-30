@@ -216,8 +216,9 @@ cosmac_fullcontextrestore:
  * Description:
  *   void cosmac_sigreturn(const uint8_t *copy, uint8_t *regs)
  *
- *   End of signal delivery: copy the saved frame (R7) back to its place on
- *   the stack (R8) and resume it.  The caller's own stack lies there, so
+ *   End of signal delivery: copy the saved frame and the thread's free
+ *   byte above it (R7, XCPTCONTEXT_SIGSIZE bytes) back to their place on
+ *   the stack (R8) and resume the frame.  The caller's own stack lies there, so
  *   interrupts are disabled first and the copy uses registers only.  Does
  *   not return.
  *
@@ -228,7 +229,7 @@ cosmac_sigreturn:
 	sex	3
 	dis
 	.byte	0x23
-	ldi	XCPTCONTEXT_SIZE
+	ldi	XCPTCONTEXT_SIGSIZE
 	plo	9
 1:	lda	7
 	str	8
@@ -236,8 +237,8 @@ cosmac_sigreturn:
 	dec	9
 	glo	9
 	lbnz	1b
-	glo	8			/* R7 := regs (R8 - XCPTCONTEXT_SIZE) */
-	smi	XCPTCONTEXT_SIZE
+	glo	8			/* R7 := regs (R8 - XCPTCONTEXT_SIGSIZE) */
+	smi	XCPTCONTEXT_SIGSIZE
 	plo	7
 	ghi	8
 	smbi	0
