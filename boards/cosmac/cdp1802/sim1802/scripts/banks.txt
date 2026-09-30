@@ -48,6 +48,10 @@ hot     libc.a:lib_isspace.o
 hot     libsched.a:sched_getfiles.o
 hot     libc.a:lib_memset.o
 hot     libfs.a:fs_files.o
+hot     libc.a:lib_strchr.o
+hot     libsched.a:sched_lock.o
+hot     libsched.a:sched_unlock.o
+hot     libsched.a:sched_gettcb.o
 
 auto    libarch.a:*
 auto    libmm.a:*
@@ -65,7 +69,8 @@ fixed   libsched.a:sched_switchcontext.o
 fixed   libsched.a:sched_roundrobin.o
 
 # Console output crosses many objects for every character (formatting,
-# the stdio stream, the buffer).  Keep that chain in one bank and the
+# the stdio stream, the buffer), and so does formatting into memory
+# (snprintf, procfs files).  Keep that chain in one bank and the
 # write path (file write, serial driver, syslog) in another, so that far
 # calls happen per line, not per character (Step 09: one character cost
 # about 13 000 machine cycles with the chain spread over five banks).
@@ -87,6 +92,10 @@ fixed   libsched.a:sched_roundrobin.o
 0       libc.a:lib_vfprintf.o
 0       libc.a:lib_snprintf.o
 0       libc.a:lib_rdflush_unlocked.o
+0       libc.a:lib_vsnprintf.o
+0       libc.a:lib_vasprintf.o
+0       libc.a:lib_asprintf.o
+0       libfs.a:fs_procfsutil.o
 1       libdrivers.a:serial.o
 1       libdrivers.a:serial_io.o
 1       libfs.a:fs_write.o
