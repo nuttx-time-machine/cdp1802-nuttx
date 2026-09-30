@@ -41,6 +41,36 @@ fixed   libsched.a:clock_systime_ticks.o
 fixed   libsched.a:sched_switchcontext.o
 fixed   libsched.a:sched_roundrobin.o
 
+# Console output crosses many objects for every character (formatting,
+# the stdio stream, the buffer).  Keep that chain in one bank and the
+# write path (file write, serial driver, syslog) in another, so that far
+# calls happen per line, not per character (Step 09: one character cost
+# about 13 000 machine cycles with the chain spread over five banks).
+
+0       libc.a:lib_libvsprintf.o
+0       libc.a:lib_ultoa_invert.o
+0       libc.a:lib_stdoutstream.o
+0       libc.a:lib_memoutstream.o
+0       libc.a:lib_nulloutstream.o
+0       libc.a:lib_libfwrite.o
+0       libc.a:lib_libfflush.o
+0       libc.a:lib_libflushall.o
+0       libc.a:lib_fflush.o
+0       libc.a:lib_fputc.o
+0       libc.a:lib_fputs.o
+0       libc.a:lib_puts.o
+0       libc.a:lib_printf.o
+0       libc.a:lib_fprintf.o
+0       libc.a:lib_vfprintf.o
+0       libc.a:lib_snprintf.o
+0       libc.a:lib_rdflush_unlocked.o
+1       libdrivers.a:serial.o
+1       libdrivers.a:serial_io.o
+1       libfs.a:fs_write.o
+1       libdrivers.a:syslog_write.o
+1       libdrivers.a:syslog_channel.o
+1       libc.a:lib_syslograwstream.o
+
 auto    libsched.a:*
 auto    libc.a:*
 auto    libfs.a:*
