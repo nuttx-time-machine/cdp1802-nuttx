@@ -99,7 +99,9 @@
  *     M(E+1..E+2): address A of the stub's inline data {target, bank}
  *     M(E+3..E+4): return address into the stub's caller
  *   Leaves with SP = E+2, the callee's return address replaced with
- *   __cosmac_farret, the arguments unchanged.
+ *   __cosmac_farret, the arguments unchanged.  When the callee's bank is
+ *   the one selected, the return address is left alone and nothing is
+ *   pushed on the bank return stack.
  *
  ****************************************************************************/
 
@@ -158,7 +160,30 @@ __cosmac_farcall:
 	ldn	6
 	plo	6			/* R6.0 := new bank */
 
+	/* The callee's bank is already selected (a call through a function
+	 * pointer or a stub from code of the same bank): no bank switch and no
+	 * BRS entry.  Leave the stub's caller's return address in place, so
+	 * that the callee returns to it directly.
+	 */
+
+	inc	15
+	inc	15
+	inc	15			/* R15 = &bank */
+	sex	15
+	glo	6
+	xor				/* D := new bank ^ current bank */
+	sex	2
+	dec	15
+	dec	15
+	dec	15			/* R15 = &state */
+	lbnz	2f
+	dec	2
+	dec	2			/* R2 = E */
+	lbr	.Lenter
+
 	/* One BRS entry less, or overflow */
+
+2:
 
 	inc	15
 	inc	15			/* R15 = &free */
@@ -220,6 +245,8 @@ __cosmac_farcall:
 	str	15			/* brsp := R6 */
 
 	/* Restore R15 and DF; enter the callee with IE as it was */
+
+.Lenter:
 
 	ldi	%lo(g_cosmac_bankstate + BS_FLAGS)
 	plo	15			/* R15 = &flags (no page crossing) */
