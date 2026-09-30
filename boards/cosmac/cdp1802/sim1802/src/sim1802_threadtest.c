@@ -33,6 +33,10 @@
  * 4. Signals: SIGUSR1 to a task blocked in sem_wait() (its saved frame is
  *    redirected to the signal trampoline; sem_wait() fails with EINTR),
  *    and SIGUSR2 from a watchdog (interrupt context) to the running task.
+ *    Then a signal storm: a watchdog signals a running task 100 times
+ *    while it makes near calls and checks their results, so that signals
+ *    land on every kind of instruction, including the NCRT routines and
+ *    code that keeps a temporary in the free byte M(R2).
  * 5. Context-switch cost: two tasks alternate with sched_yield().
  * All tasks return, so task exit is exercised too.  Then the simulator
  * halts with status 0.
@@ -70,6 +74,7 @@
 #define TT_RR_SAMPLES    12       /* 60 ms apart */
 #define TT_SEM_ROUNDS    4
 #define TT_YIELDS        200
+#define TT_STORM         100      /* signals to a running task */
 
 /****************************************************************************
  * Private Data
@@ -82,6 +87,8 @@ static sem_t g_pong;
 static sem_t g_never;
 static struct wdog_s g_wdog;
 static volatile bool g_stop;
+static struct wdog_s g_stormdog;
+static volatile unsigned int g_storm;
 
 /****************************************************************************
  * Private Functions
@@ -219,6 +226,73 @@ static int tt_sigrunning(int argc, FAR char *argv[])
   return 0;
 }
 
+/* 4b. Signal storm */
+
+static void tt_storm_handler(int signo)
+{
+  volatile unsigned int i;
+
+  /* A varying amount of work, so that the next tick lands at another
+   * point of the interrupted loop.
+   */
+
+  for (i = 0; i < g_storm % 7; i++)
+    {
+    }
+
+  g_storm++;
+}
+
+static void tt_stormdog(wdparm_t arg)
+{
+  /* Every 7 to 9 ticks: delivering a signal takes several ticks, and a
+   * signal that comes during a delivery is handled by that delivery, so
+   * closer signals would rarely find the task in its loop.
+   */
+
+  nxsig_kill((pid_t)arg, SIGUSR1);
+  if (g_storm < TT_STORM)
+    {
+      wd_start(&g_stormdog, 7 + g_storm % 3, tt_stormdog, arg);
+    }
+}
+
+static unsigned int __attribute__((noipa)) tt_step(unsigned int x)
+{
+  return 3 * x + 1;
+}
+
+static int tt_storm_task(int argc, FAR char *argv[])
+{
+  struct sigaction act;
+  unsigned int errors = 0;
+  unsigned int calls = 0;
+  unsigned int x = 1;
+  unsigned int y;
+
+  act.sa_handler = tt_storm_handler;
+  act.sa_flags   = 0;
+  sigemptyset(&act.sa_mask);
+  sigaction(SIGUSR1, &act, NULL);
+  sem_post(&g_ready);
+
+  while (g_storm < TT_STORM)
+    {
+      y = tt_step(x);
+      if (y != 3 * x + 1)
+        {
+          errors++;
+        }
+
+      x = y ^ calls++;
+    }
+
+  syslog(LOG_INFO, "threads: signal storm: %u signals, %u errors\n",
+         g_storm, errors);
+  sem_post(&g_done);
+  return 0;
+}
+
 /* 5. Context switch cost */
 
 static int tt_yield_partner(int argc, FAR char *argv[])
@@ -332,6 +406,12 @@ int sim1802_threadtest_main(int argc, FAR char *argv[])
   pid = tt_start("sigrunning", TT_PRIORITY, tt_sigrunning, NULL);
   sem_wait(&g_ready);
   wd_start(&g_wdog, 10, tt_wdog, (wdparm_t)pid);
+  sem_wait(&g_done);
+
+  g_storm = 0;
+  pid = tt_start("storm", TT_PRIORITY, tt_storm_task, NULL);
+  sem_wait(&g_ready);
+  wd_start(&g_stormdog, 1, tt_stormdog, (wdparm_t)pid);
   sem_wait(&g_done);
 
   /* 5. Context switch cost: both tasks above the init task's priority,
