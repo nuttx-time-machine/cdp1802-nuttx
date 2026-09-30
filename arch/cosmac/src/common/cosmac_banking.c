@@ -37,8 +37,8 @@
  * Private Data
  ****************************************************************************/
 
-/* The bank return stack of a thread that is exiting (see
- * cosmac_bank_exitstate()).
+/* The bank return stack of a thread that is exiting, or that overflowed
+ * its own (see cosmac_bank_exitstate()).
  */
 
 static uint8_t g_cosmac_exit_brs[3 * CONFIG_COSMAC_BRS_DEPTH];
@@ -52,12 +52,16 @@ static uint8_t g_cosmac_exit_brs[3 * CONFIG_COSMAC_BRS_DEPTH];
  *
  * Description:
  *   Called by __cosmac_farcall, with interrupts disabled, when a thread
- *   nests more than CONFIG_COSMAC_BRS_DEPTH far calls.
+ *   nests more than CONFIG_COSMAC_BRS_DEPTH far calls.  The report and
+ *   PANIC() are banked code, reached by far calls, so switch to the static
+ *   exit BRS first; otherwise every far call on the way overflows again
+ *   and the recursion runs the stack out of RAM.
  *
  ****************************************************************************/
 
 void cosmac_brs_overflow(void)
 {
+  cosmac_bank_exitstate();
   _alert("bank return stack overflow (CONFIG_COSMAC_BRS_DEPTH=%d)\n",
          CONFIG_COSMAC_BRS_DEPTH);
   PANIC();
@@ -122,7 +126,7 @@ void cosmac_bank_switch(FAR struct tcb_s *from, FAR struct tcb_s *to)
  *   releases the exiting thread's TCB, and with it the bank return stack
  *   that the far calls it makes would use: switch to a static one, keeping
  *   the selected bank.  The thread's own entries are discarded, since it
- *   never returns.
+ *   never returns.  cosmac_brs_overflow() uses it the same way.
  *
  ****************************************************************************/
 
