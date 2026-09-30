@@ -38,6 +38,10 @@
  *    land on every kind of instruction, including the NCRT routines and
  *    code that keeps a temporary in the free byte M(R2).
  * 5. Context-switch cost: two tasks alternate with sched_yield().
+ * 6. printf conversions of every integer size, including long long values
+ *    above 32 bits followed by one more argument: without
+ *    CONFIG_LIBC_LONG_LONG only their low 32 bits are printed, but the
+ *    argument list must stay in step.
  * All tasks return, so task exit is exercised too.  Then the simulator
  * halts with status 0.
  */
@@ -425,6 +429,13 @@ int sim1802_threadtest_main(int argc, FAR char *argv[])
   sched_unlock();
   sem_wait(&g_done);
   sem_wait(&g_done);
+
+  /* 6. printf */
+
+  syslog(LOG_INFO, "threads: printf %d %u %x %ld %lu %lx %lld %llu %llx "
+         "%zu|%d\n", -12345, 65535u, 0xbeefu, -2000000000l, 4000000000ul,
+         0xdeadbeeful, -123456789ll, 0x123456789ull,
+         0xfedcba9876543210ull, (size_t)40000, 7);
 
   tt_stack("init");
   syslog(LOG_INFO, "threads: done\n");
