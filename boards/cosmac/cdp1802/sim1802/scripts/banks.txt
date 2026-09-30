@@ -26,6 +26,29 @@ fixed   libarch.a:cosmac_doswitch.o
 fixed   libarch.a:cosmac_switchcontext.o
 fixed   libarch.a:cosmac_exit.o
 fixed   libarch.a:cosmac_sigdeliver.o
+
+# Small functions called from everywhere: each call from a bank to another
+# costs about 330 machine cycles of trampolines (NSH's ps made 3 394 far
+# calls, 636 of them to memcpy).  They stay in fixed ROM while it has room,
+# most frequently called first; ostest, whose read-only strings fill the
+# fixed ROM, banks them instead.
+
+hot     libc.a:lib_memcpy.o
+hot     libc.a:arch_atomic.o
+hot     libc.a:lib_strlen.o
+hot     libc.a:lib_strnlen.o
+hot     libc.a:lib_strncmp.o
+hot     libc.a:lib_strcmp.o
+hot     libsched.a:task_gettid.o
+hot     libc.a:sem_wait.o
+hot     libc.a:sem_post.o
+hot     libmm.a:mm_lock.o
+hot     libc.a:lib_isbasedigit.o
+hot     libc.a:lib_isspace.o
+hot     libsched.a:sched_getfiles.o
+hot     libc.a:lib_memset.o
+hot     libfs.a:fs_files.o
+
 auto    libarch.a:*
 auto    libmm.a:*
 
