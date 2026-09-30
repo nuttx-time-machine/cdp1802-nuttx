@@ -32,6 +32,10 @@ ifeq ($(CONFIG_SIM1802_UART0),y)
 CSRCS += sim1802_serial.c
 endif
 
+ifeq ($(CONFIG_SIM1802_CONSOLE),y)
+CSRCS += sim1802_console.c
+endif
+
 ifeq ($(CONFIG_BOARD_SIM1802_TICKTEST),y)
 CSRCS += sim1802_ticktest.c
 endif

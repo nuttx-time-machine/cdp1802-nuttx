@@ -44,6 +44,14 @@ config COSMAC_IRQSTATE_SWFLAG
 
 endchoice # Interrupt enable state
 
+config COSMAC_BOARD_CONSOLE
+	bool
+	default n
+	---help---
+		Selected by a board that registers its own /dev/console instead
+		of using NuttX's serial driver: up_initialize() then calls the
+		board's cosmac_serialinit().
+
 config COSMAC_BANKING
 	bool
 	default n

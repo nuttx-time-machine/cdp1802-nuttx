@@ -54,6 +54,10 @@
 #define SIM1802_CMD_CYCLES_LATCH      0x84
 #define SIM1802_CMD_CYCLES_READ0      0x85  /* latched count, byte 0..3 */
 #define SIM1802_CMD_CONSOLE_PUTCHAR   0xe0
+#define SIM1802_CMD_CONSOLE_GETCHAR   0xe1  /* buffer := next input byte */
+#define SIM1802_CMD_CONSOLE_STATUS    0xe2  /* buffer := input status: */
+#define SIM1802_CONSOLE_AVAILABLE     0x01  /*   a byte is waiting */
+#define SIM1802_CONSOLE_EOF           0x02  /*   end of input */
 
 #define SIM1802_TIMER_CYCLES          4
 

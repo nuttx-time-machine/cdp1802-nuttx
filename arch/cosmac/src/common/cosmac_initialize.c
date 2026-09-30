@@ -47,7 +47,7 @@
 
 void up_initialize(void)
 {
-#ifdef CONFIG_MCU_SERIAL
+#if defined(CONFIG_MCU_SERIAL) || defined(CONFIG_COSMAC_BOARD_CONSOLE)
   cosmac_serialinit();
 #endif
 }

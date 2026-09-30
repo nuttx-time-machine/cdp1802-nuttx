@@ -30,6 +30,7 @@
 
 #include <nuttx/board.h>
 #include <nuttx/fs/fs.h>
+#include <nuttx/sched.h>
 
 #include <arch/board/board.h>
 
@@ -56,9 +57,14 @@ void cdp1802_boardinitialize(void)
  * Description:
  *   Called by nx_bringup() once the OS is running
  *   (CONFIG_BOARD_LATE_INITIALIZE): mounts procfs, which NSH's ps and free
- *   read.
+ *   read, and with CONFIG_SIM1802_START_NSH starts NSH itself, instead of
+ *   an init task started through task_spawn() (CONFIG_INIT_NONE).
  *
  ****************************************************************************/
+
+#ifdef CONFIG_SIM1802_START_NSH
+int nsh_main(int argc, FAR char *argv[]);
+#endif
 
 void board_late_initialize(void)
 {
@@ -69,5 +75,10 @@ void board_late_initialize(void)
     {
       syslog(LOG_ERR, "ERROR: Failed to mount procfs: %d\n", ret);
     }
+#endif
+
+#ifdef CONFIG_SIM1802_START_NSH
+  task_create("nsh", CONFIG_SIM1802_NSH_PRIORITY,
+              CONFIG_SIM1802_NSH_STACKSIZE, nsh_main, NULL);
 #endif
 }

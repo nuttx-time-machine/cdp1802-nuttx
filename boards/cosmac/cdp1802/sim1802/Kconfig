@@ -60,6 +60,40 @@ config SIM1802_UART0
 		/dev/console device when UART0 is the serial console.  Without it,
 		the console is syslog output only (CONFIG_CONSOLE_SYSLOG).
 
+config SIM1802_CONSOLE
+	bool "Minimal console driver (/dev/console only)"
+	default n
+	depends on !SIM1802_UART0
+	select COSMAC_BOARD_CONSOLE
+	---help---
+		A few hundred bytes instead of NuttX's serial driver (about
+		11 KB): /dev/console writes to the simulator console and reads
+		from it, sleeping until the input interrupt (IRQ 6).  No
+		buffering, termios or flow control.  For configurations that
+		must fit a flat ROM.
+
+config SIM1802_START_NSH
+	bool "Start NSH from the board, without an init task"
+	default n
+	depends on INIT_NONE && BOARD_LATE_INITIALIZE && NSH_LIBRARY
+	---help---
+		board_late_initialize() starts nsh_main() with task_create().
+		The usual init task is started with task_spawn(), which links
+		about 5 KB of spawn-attribute and scheduler-parameter code on the
+		CDP1802; this is for configurations that must fit a flat ROM.
+
+if SIM1802_START_NSH
+
+config SIM1802_NSH_PRIORITY
+	int "NSH task priority"
+	default 100
+
+config SIM1802_NSH_STACKSIZE
+	int "NSH task stack size"
+	default 1536
+
+endif # SIM1802_START_NSH
+
 config BOARD_SIM1802_CLOCK_HZ
 	int "Nominal CPU clock (Hz)"
 	default 4000000
