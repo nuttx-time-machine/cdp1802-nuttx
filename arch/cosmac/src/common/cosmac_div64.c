@@ -35,7 +35,10 @@
  * and nanosecond conversions), the 16- or 32-bit division of libgcc's
  * hand-written assembly is used instead of the 64-iteration loop.  The
  * operands' high parts are tested through a union, not with 64-bit shifts,
- * which are library calls on this CPU.
+ * which are library calls on this CPU.  The loop itself works on bytes:
+ * written with 64-bit shifts, comparisons and subtractions it compiled to
+ * about 4.5 KB, the byte loops take a few hundred bytes (slower, but the
+ * loop only runs when an operand does not fit in 32 bits).
  */
 
 /****************************************************************************
@@ -44,6 +47,7 @@
 
 #include <nuttx/config.h>
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -68,6 +72,7 @@ union cosmac_u64_u
       uint32_t hi;
       uint32_t lo;
     } l;
+  uint8_t b[8];                 /* b[0] most significant */
 };
 
 /****************************************************************************
@@ -82,6 +87,59 @@ int64_t __moddi3(int64_t a, int64_t b);
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+/* Shift a big-endian 64-bit value left by one; "in" enters bit 0.
+ * Returns the bit shifted out of bit 63.
+ */
+
+static uint8_t noinline_function shl64(FAR uint8_t *v, uint8_t in)
+{
+  int i;
+
+  for (i = 7; i >= 0; i--)
+    {
+      uint8_t out = v[i] >> 7;
+
+      v[i] = (uint8_t)(v[i] << 1) | in;
+      in = out;
+    }
+
+  return in;
+}
+
+/* a >= b, big-endian 64-bit values */
+
+static bool noinline_function ge64(FAR const uint8_t *a,
+                                   FAR const uint8_t *b)
+{
+  int i;
+
+  for (i = 0; i < 8; i++)
+    {
+      if (a[i] != b[i])
+        {
+          return a[i] > b[i];
+        }
+    }
+
+  return true;
+}
+
+/* a -= b, big-endian 64-bit values */
+
+static void noinline_function sub64(FAR uint8_t *a, FAR const uint8_t *b)
+{
+  uint8_t borrow = 0;
+  int i;
+
+  for (i = 7; i >= 0; i--)
+    {
+      uint16_t t = (uint16_t)a[i] - b[i] - borrow;
+
+      a[i] = (uint8_t)t;
+      borrow = (uint8_t)((t >> 8) & 1);
+    }
+}
 
 /****************************************************************************
  * Name: udivmod64
@@ -98,8 +156,7 @@ static uint64_t noinline_function udivmod64(uint64_t n, uint64_t d,
 {
   union cosmac_u64_u un;
   union cosmac_u64_u ud;
-  uint64_t q = 0;
-  uint64_t r = 0;
+  union cosmac_u64_u ur;
   int i;
 
   un.v = n;
@@ -137,22 +194,27 @@ static uint64_t noinline_function udivmod64(uint64_t n, uint64_t d,
         }
     }
 
-  for (i = 63; i >= 0; i--)
+  /* Restoring division: the dividend shifts out of un into the remainder
+   * ur, and the quotient bits shift into un.
+   */
+
+  ur.v = 0;
+  for (i = 0; i < 64; i++)
     {
-      r = (r << 1) | ((n >> i) & 1);
-      if (r >= d)
+      shl64(ur.b, shl64(un.b, 0));
+      if (ge64(ur.b, ud.b))
         {
-          r -= d;
-          q |= (uint64_t)1 << i;
+          sub64(ur.b, ud.b);
+          un.b[7] |= 1;
         }
     }
 
   if (rem != NULL)
     {
-      *rem = r;
+      *rem = ur.v;
     }
 
-  return q;
+  return un.v;
 }
 
 /****************************************************************************
