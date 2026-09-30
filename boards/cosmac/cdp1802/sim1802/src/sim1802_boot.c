@@ -26,7 +26,10 @@
 
 #include <nuttx/config.h>
 
+#include <syslog.h>
+
 #include <nuttx/board.h>
+#include <nuttx/fs/fs.h>
 
 #include <arch/board/board.h>
 
@@ -51,10 +54,20 @@ void cdp1802_boardinitialize(void)
  * Name: board_late_initialize
  *
  * Description:
- *   Called by nx_bringup() once the OS is running.  Nothing to do yet.
+ *   Called by nx_bringup() once the OS is running
+ *   (CONFIG_BOARD_LATE_INITIALIZE): mounts procfs, which NSH's ps and free
+ *   read.
  *
  ****************************************************************************/
 
 void board_late_initialize(void)
 {
+#ifdef CONFIG_FS_PROCFS
+  int ret = nx_mount(NULL, "/proc", "procfs", 0, NULL);
+
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to mount procfs: %d\n", ret);
+    }
+#endif
 }
